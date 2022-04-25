@@ -36,12 +36,16 @@ class Station():
         #Set obtype to float
         def str_to_float(x):
             try: 
-                return x.replace(',', '.')
+                return float(x.replace(',', '.'))
             except:
-                return x
+                return float(x)
         df['value'] = df['value'].apply(str_to_float)
         df['value'].astype(float)
 
+
+        #Filter unreliable values
+        df = df[~df['flag'].str.contains('unreliable')]
+        df.loc[df['value'] < 0, 'value'] = 0
         return df
 
     def load_ts(self, filepath=None, data_type=None, time_resolution=None):
@@ -49,6 +53,8 @@ class Station():
         if filepath is None:
             filepath = self.path[data_type][time_resolution]
         df=pd.read_csv(filepath)
+
+        df.dropna(subset=['value'])
         
         #Set datetime as index
         df['date'] = pd.to_datetime(df['date'])
