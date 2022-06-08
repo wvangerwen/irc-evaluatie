@@ -1,19 +1,20 @@
 # %%
-
-from zlib import DEFLATED
 import functions.folders as folders
 import functions.station_cls as station_cls
+import functions.fews_xml_reader as fews_xml_reader
 import importlib
 importlib.reload(folders)
 importlib.reload(station_cls) #Reload folders to skip kernel reload.
-import functions.folders as folders
 import pandas as pd
 import geopandas as gpd
 import os
 import matplotlib.pyplot as plt
 import re
+import numpy as np
+from functools import reduce
 
 folder = folders.Folders(os.pardir) #create folder structure from parent dir. 
+
 
 #Alle stations in ruwe data.
 # Hier alle stations met bijhorende metadata in plaatsen. De bijhorende timeseries moeten
@@ -21,54 +22,74 @@ folder = folders.Folders(os.pardir) #create folder structure from parent dir.
 stations_df = gpd.read_file(folder.input.ground_stations.path)
 
 
-# %% 
+ORG_SETTINGS = {'HHNK':
+                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('HHNK_neerslagmeters_20220101_20220513_1min.csv'),
+                    'skiprows': 0,
+                    'sep': ';',
+                    'date_col':'Unnamed: 0'},
+                'HDSR':
+                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('HDSR_neerslagdata_2022_5min.xml')},
+                'WL':
+                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('WL_neerslagdata_202205141515_5min.xml')}
+                }
 
-for index, row in stations_df.iterrows():
-    if row['ID'] =='MPN-AS-2371':
-        break
-#Init station
-station = station_cls.Station(folder, row)
+WIWB_SETTINGS = {'irc_early':
+                    {'raw_filepath':folder.input.paths['wiwb']['raw'].full_path('HHNK_HDSR_WL_irc_early_2022-05-21_2022-05-21.parquet')},
+                'irc_realtime':
+                    {'raw_filepath':folder.input.paths['wiwb']['raw'].full_path('HHNK_HDSR_WL_irc_realtime_2022-05-21_2022-05-21.parquet')},
+                }
 
-#TODO raw data staat in de gitignore. Dus dit stukje hieronder gaat niet werken. 
-#Load raw
-p_raw = station.load_ts_raw()
 
-#Resample
-df_p = {}
-df_p['1h'] = p_raw['value'].resample('h').sum()
-df_p['24h']= p_raw['value'].resample('d').sum()
+# %% Resample data
 
-# Write to file
-station.to_file(df=df_p['1h'], output_path=station.path['station']['1h'])
-station.to_file(df=df_p['24h'], output_path=station.path['station']['24h'])
+#Station 
+for organisation in ORG_SETTINGS:
+    stations_organisation = station_cls.Stations_organisation(folder=folder,          
+                                organisation=organisation)
 
-# %% CREATE TEST DATASET OF IRC RESULTS
+    #Resample timeseries to hour and day values.
+    locations = stations_organisation.resample(**ORG_SETTINGS[organisation], overwrite=False)
 
-print('Creating test dataset')
-for index, data_type in enumerate(['irc_realtime_current',
-    'irc_realtime_beta_202201',
-    'irc_realtime_beta_202204',
-    'irc_final_current',
-    'irc_final_beta_202204']):
-    for time_resolution in ['1h', '24h']:
+    #Add locations from xml to the gpkg
+    stations_organisation.add_xml_locations_to_gpkg(locations)
 
-        df= df_p[time_resolution].copy()
+#Wiwb
+wiwb_combined = station_cls.Wiwb_combined(folder=folder, wiwb_settings=WIWB_SETTINGS)
+wiwb_combined.resample(overwrite=True)
 
-        df= df * float(f"1.{index+1}") #Multiply original values by 1.1, 1.2, etc
-        station.to_file(df = df, output_path=station.path[data_type][time_resolution])
+
+# %% LOAD ALL TIMESERIES
+
+#Combine stations into one df
+organisations=['HHNK', 'HDSR', 'WL']
+
+irc_type='irc_early'
+resample_rule='h'
+
+#Initialize stations
+wiwb_combined = station_cls.Wiwb_combined(folder=folder, wiwb_settings=WIWB_SETTINGS) #This can load the wiwb timeseries
+stations_combined = station_cls.Stations_combined(folder=folder, organisations=organisations, wiwb_combined=wiwb_combined)
+stations_combined.load_stations(resample_rule=resample_rule)
+stations_combined.load_wiwb(resample_rule=resample_rule)
+
+
+#Initialize WIWB
+for station in stations_combined:
+    print(station.code)
+    break
+
 
 # %% STATISTICS
 
 
 class TsStats():
     """Load specific timeseries of station and plot their values and statistics. """
-    def __init__(self, station, time_resolution='1h'):
+    def __init__(self, station, time_resolution='h'):
         self.station = station
         self.data_type_irc = 'irc_realtime_current'
         self.time_resolution = time_resolution
         self.df_station = station.load_ts(data_type='station', time_resolution=self.time_resolution)
         self.df_irc = station.load_ts(data_type=self.data_type_irc, time_resolution=self.time_resolution)
-
 
         #Classify the station timeseries
         self.classes = self.create_classes()

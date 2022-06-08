@@ -262,7 +262,6 @@ class Folders(Folder):
         self.output = OutputPath(self.base)
 
 
-
     @property
     def structure(self):
         return f"""  
@@ -282,15 +281,26 @@ class InputPath(Folder):
 
         #Input from different sources
         self.paths = {}
-        self.data_types =  ['station', 'irc_realtime_current', 'irc_realtime_beta_202201', 'irc_realtime_beta_202204', 'irc_final_current', 'irc_final_beta_202204']
+        self.data_types =  ['station', 'wiwb']
+        self.irc_types = ['irc_realtime_current', 'irc_realtime_beta_202201', 'irc_realtime_beta_202204', 'irc_final_current', 'irc_final_beta_202204']
         self.time_resolutions = ['1h', '24h']
-        for data_type in self.data_types:
-            self.paths[data_type] = {}
-            for time_resolution in self.time_resolutions:
-                self.paths[data_type][time_resolution] = Folder(base=os.path.join(self.base, f"p_{time_resolution}_{data_type}"))
-                self.paths[data_type][time_resolution].create()
+
+        self.paths['station'] = {}
+        self.paths['station']['raw'] = Folder(base=os.path.join(self.base, f"p_raw_station"))
+        self.paths['station']['resampled'] = Folder(base=os.path.join(self.base, f"p_resampled_station"))
+
+        self.paths['wiwb'] = {}
+        self.paths['wiwb']['raw'] = Folder(base=os.path.join(self.base, f"p_raw_wiwb"))
+        self.paths['wiwb']['resampled'] = Folder(base=os.path.join(self.base, f"p_resampled_wiwb"))
+
+        # for data_type in self.data_types:
+        #     self.paths[data_type] = {}
+        #     for time_resolution in self.time_resolutions:
+        #         # self.paths[data_type][time_resolution] = Folder(base=os.path.join(self.base, f"p_{time_resolution}_{data_type}"))
+        #         # self.paths[data_type][time_resolution].create()
 
 
+        
         # Files
         self.add_file("ground_stations", 'ground_stations.gpkg', ftype='file')
 

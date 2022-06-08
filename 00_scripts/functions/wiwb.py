@@ -1,6 +1,6 @@
 from datetime import timedelta, datetime
 import pandas as pd
-from wiwb_downloader import GridDownloader
+from wiwb_downloader import GridDownloader #pip install git+https://gitlab.com/hetwaterschapshuis/kenniscentrum/information-retrieval/wiwb-downloader
 import numpy as np
 import geopandas as gpd
 
@@ -19,7 +19,8 @@ def format_datetime(value: datetime) -> str:
     """
     return value.strftime('%Y-%m-%d %H:%M')
 
-def get_points():
+
+def get_points_from_gdf(locs):
     """Make a dictionary with name: Point out of the gpkg
 
     Returns
@@ -29,13 +30,14 @@ def get_points():
     extent[list]
         list with extent xmin, ymin, xmax, ymax based on geometries
     """
-    locs = gpd.read_file("../01_data/ground_stations.gpkg")
+    # locs = gpd.read_file("../01_data/ground_stations.gpkg")
     extent = [locs.geometry.x.min(), locs.geometry.y.min(), locs.geometry.x.max(), locs.geometry.y.max()]
     return locs.set_index("WEERGAVENAAM")["geometry"].to_dict(), extent
 
-def code_to_name():
-    locs = gpd.read_file("../01_data/ground_stations.gpkg")
-    return locs.set_index("WEERGAVENAAM")["ID"].to_dict()
+
+# def code_to_name():
+#     locs = gpd.read_file("../01_data/ground_stations.gpkg")
+#     return locs.set_index("WEERGAVENAAM")["ID"].to_dict()
 
 
 def add_columns_for_points(df: pd.DataFrame, cells: dict, points: dict):
@@ -64,6 +66,7 @@ def add_columns_for_points(df: pd.DataFrame, cells: dict, points: dict):
         new_df_list.append(df[i].rename(name))
     new_df = pd.concat(new_df_list, axis=1)
     return new_df
+
 
 def download_wiwb(data_source: str, points: dict, start: datetime, end: datetime, extent: list) -> pd.Series:
     """Download grid data from the wiwb and parse to series with multiindex (datetime, location).
