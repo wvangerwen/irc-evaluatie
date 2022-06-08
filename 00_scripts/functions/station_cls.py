@@ -6,22 +6,31 @@ import numpy as np
 import geopandas as gpd
 from pathlib import Path
 
+
+RESAMPLE_TEXT = {'h':'1h',
+                'd':'24h'}
+
 class Station():
     """Individual station with related timeseries."""
-    def __init__(self, folder, row, df_mask, df):
+    def __init__(self, folder, row, resample_rule, df, irc_types):
         self.row=row
         self.name = row['WEERGAVENAAM']
         self.code = row['ID']
         self.organisation = row['organisation']
         self.geometry = row['geometry']
-        self.data_types = folder.input.data_types #['station', 'irc_realtime_current', 'irc_r...
+        self.resample_rule = resample_rule
+        self.irc_types = irc_types
 
-        self.df_mask=df_mask
+        #Timeseries
         self.df = df
 
+    @property
+    def resample_text(self):
+        return RESAMPLE_TEXT[self.resample_rule]
 
     def __repr__(self):
         return '.'+' .'.join([i for i in dir(self) if not i.startswith('__')])
+
 
 class Stations_organisation():
     """All stations of a single organisation with related timeseries."""
@@ -93,9 +102,6 @@ class Stations_organisation():
 
     def set_out_path(self):
         """set output paths of resampled dataframes"""
-        RESAMPLE_TEXT = {'h':'1h',
-                        'd':'24h'}
-
         out_path = {}
         out_path['value']={}
         out_path['mask']={}
@@ -164,22 +170,17 @@ class Stations_organisation():
 
 class Stations_combined():
     """Class that combines the resampled timeseries of all organisations."""
-    def __init__(self, folder, organisations, wiwb_combined):
+    def __init__(self, folder, organisations, wiwb_combined, resample_rule):
         self.folder = folder
         self.organisations=organisations
         self.stations_org={} #dict with classes of all organisations
         self.stations_df = self.load_stations_gdf()
         self.wiwb_combined = wiwb_combined
+        self.resample_rule = resample_rule
 
         for organisation in self.organisations:
             self.stations_org[organisation] = Stations_organisation(folder=self.folder,
                                     organisation=organisation)
-
-    # def load_stations(self, resample_rule):
-    #     """load timeseries from all stations"""
-    #     for organisation in self.stations_org:
-    #         stat = self.stations_org[organisation]
-    #         stat.load(resample_rule=resample_rule)
 
 
     def load_stations_gdf(self):
@@ -192,7 +193,7 @@ class Stations_combined():
         return reduce(lambda left,right: pd.merge(left,right,left_index=True, right_index=True, how='outer'), dict_df.values())   
 
 
-    def load_stations(self, resample_rule):
+    def load_stations(self):
         """Load all stations then combine all dataframes from different organisations into one df. Requires 'self.load' to be run."""
 
         #Load and combine
@@ -200,7 +201,7 @@ class Stations_combined():
         dict_mask={}
         for organisation in self.stations_org:
             stat = self.stations_org[organisation]
-            stat.load(resample_rule=resample_rule)
+            stat.load(resample_rule=self.resample_rule)
 
             dict_values[stat.organisation] = stat.df_value
             dict_mask[stat.organisation] = stat.df_mask
@@ -210,12 +211,12 @@ class Stations_combined():
         self.df_mask = self.df_mask==True #Fill nanvalues.
 
 
-    def load_wiwb(self, resample_rule):
+    def load_wiwb(self):
         """Load timeseries of wiwb results at station location"""
         
         self.df_irc = {}
         for irc_type in self.wiwb_combined.wiwb_settings:
-            self.df_irc[irc_type] = pd.read_parquet(self.wiwb_combined.out_path[irc_type][resample_rule])
+            self.df_irc[irc_type] = pd.read_parquet(self.wiwb_combined.out_path[irc_type][self.resample_rule])
 
 
     @property
@@ -225,17 +226,18 @@ class Stations_combined():
 
 
     def get_station(self, folder, row):
-        df_mask = self.df_mask[row['ID']]
-
+        """Get all timeseries of the station and combine them in one dataframe"""
+        irc_types = [i for i in self.df_irc]
         dict_station = {}
-
         dict_station['station'] = self.df[row['ID']].rename('station')
-        for irc_type in self.df_irc:
+        for irc_type in irc_types:
             dict_station[irc_type] = self.df_irc[irc_type][row['WEERGAVENAAM']].rename(irc_type)
+        dict_station['mask'] = self.df_mask[row['ID']].rename('mask')
 
+        #Combine all dataframes into one.
         df_timeseries = self.merge_df_datetime(dict_station)
 
-        return Station(folder, row, df_mask=df_mask, df = df_timeseries)
+        return Station(folder, row, self.resample_rule, df=df_timeseries, irc_types=irc_types)
 
 
     def __iter__(self):
@@ -260,8 +262,6 @@ class Wiwb_combined():
 
 
     def set_out_path(self):
-        RESAMPLE_TEXT = {'h':'1h',
-                        'd':'24h'}
 
         out_path = {}
         for irc_type in self.wiwb_settings:

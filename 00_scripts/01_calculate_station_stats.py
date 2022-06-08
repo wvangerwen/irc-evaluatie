@@ -13,6 +13,10 @@ import re
 import numpy as np
 from functools import reduce
 
+RESAMPLE_TEXT = {'h':'1h',
+                'd':'24h'}
+
+
 folder = folders.Folders(os.pardir) #create folder structure from parent dir. 
 
 
@@ -68,9 +72,9 @@ resample_rule='h'
 
 #Initialize stations
 wiwb_combined = station_cls.Wiwb_combined(folder=folder, wiwb_settings=WIWB_SETTINGS) #This can load the wiwb timeseries
-stations_combined = station_cls.Stations_combined(folder=folder, organisations=organisations, wiwb_combined=wiwb_combined)
-stations_combined.load_stations(resample_rule=resample_rule)
-stations_combined.load_wiwb(resample_rule=resample_rule)
+stations_combined = station_cls.Stations_combined(folder=folder, organisations=organisations, wiwb_combined=wiwb_combined, resample_rule=resample_rule)
+stations_combined.load_stations()
+stations_combined.load_wiwb()
 
 
 #Initialize WIWB
@@ -79,36 +83,46 @@ for station in stations_combined:
     break
 
 
+
+
 # %% STATISTICS
+
+class IrcStats():
+    """Statistics per irc type"""
+    def __init__(self, tsstats, irc_type):
+        self.irc_type = irc_type
+        self.residuals = tsstats.df[irc_type] - tsstats.df['station']
+        self.gauge_mean = tsstats.df['station'].mean()
+        self.irc_mean = tsstats.df[irc_type].mean()
+        self.CV = round(tsstats.df['station'].std()/self.gauge_mean, 2) #?
+        self.BiasTotal = self.residuals.mean()
+        self.RelBiasTotal = round(self.BiasTotal/self.gauge_mean *100,2) #Relative bias %.
+
+    def __repr__(self):
+        return '.'+' .'.join([i for i in dir(self) if not i.startswith('__')])
 
 
 class TsStats():
-    """Load specific timeseries of station and plot their values and statistics. """
-    def __init__(self, station, time_resolution='h'):
+    """Load specific timeseries of station and plot their values and statistics. 
+    self.df is the table with all relevant timeseries"""
+    def __init__(self, station):
         self.station = station
-        self.data_type_irc = 'irc_realtime_current'
-        self.time_resolution = time_resolution
-        self.df_station = station.load_ts(data_type='station', time_resolution=self.time_resolution)
-        self.df_irc = station.load_ts(data_type=self.data_type_irc, time_resolution=self.time_resolution)
+
+        #Skip dates that dont have any (or enough) data
+        self.df_yesdata = self.get_df_yesdata() #Filter table when True, we can use the value.
+        self.df = self.station.df[self.df_yesdata].copy() #remove nodata rows
 
         #Classify the station timeseries
         self.classes = self.create_classes()
-        self.df_class = self.df_station['value'].apply(self.classify_ts)
-
-        #Skip dates that dont have any (or enough) data
-        self.df_nodata = self.get_df_nodata()
-        self.remove_nodata_rows()
+        self.df['class'] = self.df['station'].apply(self.classify_ts)
 
         #Statistics
-        self.residuals = self.df_irc['value'] - self.df_station['value']
-        self.gauge_mean = self.df_station['value'].mean()
-        self.irc_mean = self.df_irc['value'].mean()
-        self.CV = round(self.df_station['value'].std()/self.gauge_mean, 2) #?
-        self.BiasTotal = self.residuals.mean()
-        self.RelBiasTotal = round(self.BiasTotal/self.gauge_mean *100,2) #Relative bias
-        
+        self.irc_stats={}
+        for irc_type in self.station.irc_types:
+            self.irc_stats[irc_type] = IrcStats(tsstats=self, irc_type=irc_type)
+                
 
-    def plot_scatter(self):
+    def plot_scatter(self, irc_type):
         """Scatterplot comparing radar composite to ground station measurements"""
         #Init figure
         
@@ -116,7 +130,7 @@ class TsStats():
         ax=plt.gca()
 
         # Plot values
-        scatter = plt.scatter(x=self.df_station['value'], y=self.df_irc['value'], c=self.df_class)
+        scatter = plt.scatter(x=self.df['station'], y=self.df[irc_type], c=self.df['class'])
 
         handles, labels = scatter.legend_elements() #TODO add number of features in certain class.
         labels = [self.classes.set_index('value').loc[int(re.findall(r'[0-9]+', i)[0])]['legend'] for i in labels] #Get legend label from dataframe based on the class.
@@ -132,19 +146,20 @@ class TsStats():
         line = plt.plot(ax.get_xlim(), ax.get_xlim(), label='_nolegend_')
 
         #Add text        
-        scatter_text = f"""CV = {self.CV} \nRel. bias = {self.RelBiasTotal}%"""
+        scatter_text = f"""CV = {self.irc_stats[irc_type].CV} \nRel. bias = {self.irc_stats[irc_type].RelBiasTotal}%"""
 
         plt.text(0.02, 0.98, scatter_text, horizontalalignment='left',
             verticalalignment='top', transform=ax.transAxes,
             bbox=dict(facecolor='white', alpha=0.9))
 
+
         fig.suptitle(f"{self.station.name} - {self.station.organisation}", fontsize=20)
-        plt.title(f"{self.data_type_irc} - {self.time_resolution}", y=1, fontsize=16)
+        plt.title(f"{irc_type} - {self.station.resample_text}", y=1, fontsize=16)
 
 
-        if self.time_resolution=='1h':
+        if self.station.resample_text=='1h':
             timestr = 'Uur'
-        elif self.time_resolution=='24h':
+        elif self.station.resample_text=='24h':
             timestr='Dag'
         plt.xlabel(f'{timestr}som regenmeter [mm]', fontsize=16)
         plt.ylabel(f'{timestr}som radar [mm]', fontsize=16)
@@ -154,12 +169,12 @@ class TsStats():
         """Table used to classify the station p values"""
         classes = pd.DataFrame(columns=['value','range', 'legend'])
 
-        if self.time_resolution == '1h':
+        if self.station.resample_text == '1h':
             classes.loc[len(classes)] = [0,[0, 0.1], '<0.1 mm']
             classes.loc[len(classes)] = [1,[0.1,4], '0.1-4 mm']
             classes.loc[len(classes)] = [2,[4,99999], '>4 mm']
 
-        elif self.time_resolution == '24h':
+        elif self.station.resample_text == '24h':
             classes.loc[len(classes)] = [0,[0, 0.1], '<0.1 mm']
             classes.loc[len(classes)] = [1,[0.1,5], '0.1-5 mm']
             classes.loc[len(classes)] = [2,[5,10], '5-10 mm']
@@ -174,21 +189,25 @@ class TsStats():
                 return row['value'] #index value
         return None
 
-    def get_df_nodata(self):
-        """Check if any input table has nodata"""
-        #TODO check for negative values? For the test dataset this is already done in station.load_ts_raw
-        return self.df_station.notna() | self.df_irc.notna()
+
+    def get_df_yesdata(self):
+        """Check if any input table has nodata, values are True when there is a value"""
+        #Check missing values
+        df_yesdata = self.station.df.notna()
+        #Check negative values
+        df_yesdata['abovezero'] = self.station.df['station'] >= 0
+        #Check mask
+        df_yesdata['mask'] = self.station.df['mask'] == False
+        return df_yesdata.all(axis=1)
     
-    def remove_nodata_rows(self):
-        """Filter nodata values"""
-        self.df_station = self.df_station[self.df_nodata]
-        self.df_irc = self.df_irc[self.df_nodata]
-        self.df_class = self.df_class[self.df_nodata['value']]
+
+    def __repr__(self):
+        return '.'+' .'.join([i for i in dir(self) if not i.startswith('__')])
 
 
 self=TsStats(station)
 
-self.plot_scatter()
+# self.plot_scatter()
 
 # %%
 
