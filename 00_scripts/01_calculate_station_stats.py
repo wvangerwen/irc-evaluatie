@@ -72,6 +72,9 @@ wiwb_combined.resample(overwrite=True)
 #Combine stations into one df
 organisations=['HHNK', 'HDSR', 'WL']
 
+gdf = stations_combined.stations_df.copy()
+gdf.set_index('ID', inplace=True)
+
 for resample_rule in ["d", "h"]:
 
     #Initialize stations
@@ -90,23 +93,19 @@ for resample_rule in ["d", "h"]:
             # break
 
     # Combine statistics of all stations in geodataframe
-
-    gdf = stations_combined.stations_df.copy()
-    gdf.set_index('ID', inplace=True)
-
-
     for code in stations_stats:
         station_stats = stations_stats[code]
 
         for irc_type in station_stats.station.irc_types:
-            gdf.loc[code, f'rel_bias_{irc_type}'] = station_stats.irc_stats[irc_type].RelBiasTotal
-    gdf.to_file(f"../01_data/ground_stations_stats.gpkg", driver="GPKG")
-
+            gdf.loc[code, f'rel_bias_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].RelBiasTotal
+    
     #  plot some station statistics of indiviual station
     for irc_type in WIWB_SETTINGS.keys():
         for code in stations_stats:
             station_stats = stations_stats[code]
             fig = station_stats.plot_scatter(irc_type=irc_type)
             fig.savefig(f"../02_img/{irc_type}/{code}_{resample_rule}.png")
+
+gdf.to_file(f"../01_data/ground_stations_stats.gpkg", driver="GPKG")
     
 # %%
