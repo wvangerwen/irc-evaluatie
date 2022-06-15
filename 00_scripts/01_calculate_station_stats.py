@@ -1,5 +1,4 @@
 # %%
-from time import strftime
 import functions.folders as folders
 import functions.station_cls as station_cls
 import functions.station_statistics as station_statistics
@@ -41,7 +40,8 @@ ORG_SETTINGS = {'HHNK':
                     {'raw_filepath': folder.input.paths['station']['raw'].full_path('HEA_P_2022'),
                     'skiprows': 9,
                     'sep': ';',
-                    'date_col':'Timestamp'},
+                    'date_col':'Timestamp',
+                    'metadata_file': folder.input.full_path('HEA_P_metadata2.xlsx'),},
                 }
 
 WIWB_SETTINGS = {'irc_early':
@@ -57,17 +57,24 @@ WIWB_SETTINGS = {'irc_early':
 # for organisation in ORG_SETTINGS:
 for organisation in ['HEA']:
     stations_organisation = station_cls.Stations_organisation(folder=folder,          
-                                organisation=organisation)
+                                organisation=organisation,
+                                settings=ORG_SETTINGS[organisation])
 
     #Resample timeseries to hour and day values.
-    locations = stations_organisation.resample(**ORG_SETTINGS[organisation], overwrite=True)
+    locations = stations_organisation.resample(overwrite=True)
 
     #Add locations from xml to the gpkg
-    stations_organisation.add_xml_locations_to_gpkg(locations)
+    stations_organisation.add_locations_to_gpkg(locations)
 
 #Wiwb
-wiwb_combined = station_cls.Wiwb_combined(folder=folder, wiwb_settings=WIWB_SETTINGS)
+wiwb_combined = station_cls.Wiwb_combined(folder=folder, settings=WIWB_SETTINGS)
 wiwb_combined.resample(overwrite=True)
+
+
+# %%
+
+
+# %%
 
 
 # %% LOAD ALL TIMESERIES

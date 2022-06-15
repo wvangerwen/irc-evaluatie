@@ -5,6 +5,8 @@ from functools import reduce
 import numpy as np
 import geopandas as gpd
 from pathlib import Path
+import hhnk_research_tools as hrt
+from shapely.geometry import Point
 
 
 RESAMPLE_TEXT = {'h':'1h',
@@ -34,22 +36,23 @@ class Station():
 
 class Stations_organisation():
     """All stations of a single organisation with related timeseries."""
-    def __init__(self, folder, organisation, ):
+    def __init__(self, folder, organisation, settings):
         self.organisation = organisation
         self.folder = folder
+        self.settings = settings
 
         self.out_path = self.set_out_path()
 
         # self.df_mask, self.df_value = self.load_ts_raw(date_col, skiprows, sep)
         
-    def load_ts_raw(self, raw_filepath, skiprows=1, sep=';', date_col='Unnamed: 0') -> pd.DataFrame:
+    def load_ts_raw(self) -> pd.DataFrame:
         """Load raw data. Returns a mask and value dataframe
         including all stations for that organisation #TODO only works for HHNK data."""
 
         if self.organisation=='HHNK':
-            df = pd.read_csv(raw_filepath, sep=sep, skiprows=skiprows)#, parse_dates=[date_col])
+            df = pd.read_csv(self.settings['raw_filepath'], sep=self.settings['sep'], skiprows=self.settings['skiprows'])#, parse_dates=[date_col])
 
-            df.rename({date_col:'datetime', 
+            df.rename({self.settings['date_col']:'datetime', 
                         'P.meting.1m':'value',
                         'P.meting.1m quality':'flag'}, 
                         inplace=True,axis=1)
@@ -87,7 +90,7 @@ class Stations_organisation():
             locations=None
 
         if self.organisation in ['HDSR', 'WL']:
-            df_value, df_flag, locations = fews_xml_reader.fews_xml_to_df(raw_filepath)
+            df_value, df_flag, locations = fews_xml_reader.fews_xml_to_df(self.settings['raw_filepath'])
 
             if len(df_value.columns.levels[1])!= 1:
                 raise Exception('More than one parameter in the xml. Not implemented.')
@@ -105,17 +108,17 @@ class Stations_organisation():
 
             df_mask_dict = {}
             df_value_dict = {}
-            for raw_fp in Path(raw_filepath).glob('*csv'):
+            for raw_fp in Path(self.settings['raw_filepath']).glob('*csv'):
 
                 #Get metadata from headers of csv
-                df_meta = pd.read_csv(raw_fp, sep=sep, nrows=8).set_index('ts_id')
+                df_meta = pd.read_csv(raw_fp, sep=self.settings['sep'], nrows=8).set_index('ts_id')
                 station_id = df_meta.loc['site_no'].values[0]
                 station_param = df_meta.loc['ts_name'].values[0]
 
                 #Load timeseries
-                df = pd.read_csv(raw_fp, sep=sep, skiprows=skiprows)#, parse_dates=[date_col])
+                df = pd.read_csv(raw_fp, sep=self.settings['sep'], skiprows=self.settings['skiprows'])#, parse_dates=[date_col])
 
-                df.rename({date_col:'datetime', 
+                df.rename({self.settings['date_col']:'datetime', 
                             'Value':'value',
                             'Quality Code':'flag'}, 
                             inplace=True,axis=1)
@@ -151,7 +154,8 @@ class Stations_organisation():
 
             df_value = self.merge_df_datetime(df_value_dict)
             df_mask = self.merge_df_datetime(df_mask_dict)
-            locations=None
+            locations=pd.read_excel(self.settings['metadata_file'])
+
 
         return df_mask, df_value, locations
 
@@ -172,7 +176,7 @@ class Stations_organisation():
             out_path['mask'][resample_rule] = self.folder.input.paths['station']['resampled'].full_path(f'{self.organisation}_mask_{RESAMPLE_TEXT[resample_rule]}.parquet')
         return out_path
 
-    def resample(self, raw_filepath, skiprows=None, sep=None, date_col=None, overwrite=True):
+    def resample(self, overwrite=True):
         """Resample measured values to hour and day data. Save to file"""
 
         cont = [True]
@@ -184,10 +188,7 @@ class Stations_organisation():
 
         if np.all(cont) == True:
             #Load raw values
-            df_mask, df_value, locations = self.load_ts_raw(raw_filepath=raw_filepath, 
-                                                    skiprows=skiprows, 
-                                                    sep=sep, 
-                                                    date_col=date_col)
+            df_mask, df_value, locations = self.load_ts_raw()
 
             for resample_rule in ['h', 'd']:
                 #Resample
@@ -210,26 +211,43 @@ class Stations_organisation():
 
 
     #Toevoegen locaties van xml aan de gpkg
-    def add_xml_locations_to_gpkg(self, locations):
+    def add_locations_to_gpkg(self, locations):
         """Add locations from xml to the stations gpkg"""
-        stations_df = gpd.read_file(self.folder.input.ground_stations.path)
-        if locations: #For HHNK the locations are None
+        if locations is not None: #For HHNK the locations are None
+            stations_df = gpd.read_file(self.folder.input.ground_stations.path)
             stations_df_orig = stations_df.copy()
-            for loc in locations:
-                loc = locations[loc]
-                if loc.loc_id not in stations_df['ID'].values:
-                    stations_df=stations_df.append({'WEERGAVENAAM':loc.name,
-                                    'ID':loc.loc_id,
-                                    'organisation':self.organisation,
-                                    'use':True,
-                                    'geometry':loc.geometry,
-                                    }, ignore_index=True)
+            
+            #XML files here
+            if self.organisation in ['HDSR', 'WL']:
+                for loc in locations:
+                    loc = locations[loc]
+                    if loc.loc_id not in stations_df['ID'].values:
+                        stations_df=stations_df.append({'WEERGAVENAAM':loc.name,
+                                        'ID':loc.loc_id,
+                                        'organisation':self.organisation,
+                                        'use':True,
+                                        'geometry':loc.geometry,
+                                        }, ignore_index=True)
+
+
+            #HEA is a separate file.
+            elif self.organisation == 'HEA':
+                locations['geometry'] = locations.apply(lambda x: Point(x.site_x, x.site_y), axis=1)
+
+                locations.rename({'site_name':'WEERGAVENAAM', 
+                                            'Site_id':'ID',}, 
+                                            inplace=True,axis=1)
+                locations['organisation'] = 'HEA'
+                locations['use']=True
+                locations = hrt.df_add_geometry_to_gdf(locations, 'geometry')
+                stations_df = pd.merge(stations_df, locations, how='outer')[stations_df.columns]
+
 
             if len(stations_df_orig) != len(stations_df):
                 print(f'Update ground stations gpkg -- {self.folder.input.ground_stations.path}')
                 stations_df.to_file(self.folder.input.ground_stations.path, driver='GPKG')     
 
-                
+
     def __repr__(self):
         return '.'+' .'.join([i for i in dir(self) if not i.startswith('__')])
         
@@ -282,7 +300,7 @@ class Stations_combined():
         """Load timeseries of wiwb results at station location"""
         
         self.df_irc = {}
-        for irc_type in self.wiwb_combined.wiwb_settings:
+        for irc_type in self.wiwb_combined.settings:
             self.df_irc[irc_type] = pd.read_parquet(self.wiwb_combined.out_path[irc_type][self.resample_rule])
 
 
@@ -321,9 +339,9 @@ class Stations_combined():
         return '.'+' .'.join([i for i in dir(self) if not i.startswith('__')])
         
 class Wiwb_combined():
-    def __init__(self, folder, wiwb_settings):
+    def __init__(self, folder, settings):
         self.folder = folder
-        self.wiwb_settings = wiwb_settings
+        self.settings = settings
 
         self.out_path = self.set_out_path()
 
@@ -331,7 +349,7 @@ class Wiwb_combined():
     def set_out_path(self):
 
         out_path = {}
-        for irc_type in self.wiwb_settings:
+        for irc_type in self.settings:
             out_path[irc_type] = {}
             for resample_rule in ['h', 'd']:
                 out_path[irc_type][resample_rule] = self.folder.input.paths['wiwb']['resampled'].full_path(f'{irc_type}_{RESAMPLE_TEXT[resample_rule]}.parquet')
@@ -341,7 +359,7 @@ class Wiwb_combined():
     def resample(self, overwrite=True):
         """Resample wiwb values to hour and day data. Save to file"""
 
-        for irc_type in self.wiwb_settings:
+        for irc_type in self.settings:
             cont = [True]
 
             #First check if all output already exists
@@ -352,7 +370,7 @@ class Wiwb_combined():
 
             if np.all(cont) == True:
                 #Load raw values
-                df_value = pd.read_parquet(self.wiwb_settings[irc_type]['raw_filepath']).unstack(level=1).droplevel(0, axis=1)
+                df_value = pd.read_parquet(self.settings[irc_type]['raw_filepath']).unstack(level=1).droplevel(0, axis=1)
 
                 for resample_rule in ['h', 'd']:
                     #Resample
