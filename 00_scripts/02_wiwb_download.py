@@ -5,6 +5,8 @@ import plotly.express as px
 import geopandas as gpd
 
 from datetime import datetime, timedelta
+import datetime
+
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -13,61 +15,62 @@ os.environ["WIWB_USERNAME"] = "wsbd"
 os.environ["WIWB_PASSWORD"] = "4B83lSttDBity1kBtYzO"
 
 
-# %%
 
-start = datetime(2021,6,1)
-
+start_date = datetime.datetime(2022,1,1)
+end_date= datetime.datetime(2022,6,1)
 
 locs = gpd.read_file("../01_data/ground_stations.gpkg")
 locs = locs[locs['use']==True]
-points, extent = wiwb.get_points_from_gdf(locs)
-wiwb_realtime = pd.Series(dtype="float64")
-wiwb_early = pd.Series(dtype="float64")
-wiwb_final = pd.Series(dtype="float64")
 
-# %%
-current = start
-while current < datetime(2022,6,1):
-    end = current + timedelta(days=10)
-    print(f"downloading from {current} to {end}", end="\r")
+DATA_SOURCES = {'irc_realtime':"KNMI IRC Realtime",
+                'irc_early':"KNMI IRC Early Reanalysis",
+                'irc_final':"KNMI IRC Final Reanalysis"}
 
-    try:
-        df_realtime = wiwb.download_wiwb(data_source="KNMI IRC Realtime", 
-                                    points=points, 
-                                    start=current, 
-                                    end=end, 
-                                    extent=extent)
-    except:
-        continue
+MAX_END_DATE = {'irc_realtime':datetime.datetime.now() - datetime.timedelta(hours=1),
+                'irc_early':datetime.datetime.now() - datetime.timedelta(days=4),
+                'irc_final':datetime.datetime.now() - datetime.timedelta(days=30)}
 
-    if wiwb_realtime.empty:
-        wiwb_realtime = df_realtime.copy()
-    else:
-        wiwb_realtime = wiwb_realtime.append(df_realtime)
-
-    try:
-        df_early = wiwb.download_wiwb("KNMI IRC Early Reanalysis", points, current, end, extent)
-    except:
-        continue
-    if wiwb_early.empty:
-        wiwb_early = df_early.copy()
-    else:
-       wiwb_early = wiwb_early.append(df_early)
-
-    try:
-        df_final = wiwb.download_wiwb("KNMI IRC Final Reanalysis", points, current, end, extent)
-    except:
-        continue
-    if wiwb_final.empty:
-        wiwb_final = df_final.copy()
-    else:
-        wiwb_final = wiwb_final.append(df_final)
-
-    current = end
+ORGANISATIONS=['HHNK', 'HDSR', 'WL', 'HEA']
+# ORGANISATIONS=['HEA']
 
 # %%
 
-pd.DataFrame(wiwb_realtime).to_parquet(f"../01_data/p_raw_wiwb/irc_realtime_raw_{start.strftime('%Y-%m-%d')}_{end.strftime('%Y-%m-%d')}.parquet")
-pd.DataFrame(wiwb_early).to_parquet(f"../01_data/p_raw_wiwb/irc_early_raw_{start.strftime('%Y-%m-%d')}_{end.strftime('%Y-%m-%d')}.parquet")
-pd.DataFrame(wiwb_final).to_parquet(f"../01_data/p_raw_wiwb/irc_final_raw_{start.strftime('%Y-%m-%d')}_{end.strftime('%Y-%m-%d')}.parquet")
-# %%
+for organisation in ORGANISATIONS:
+    locs_organisation = locs[locs['organisation']==organisation]
+    points, extent = wiwb.get_points_from_gdf(locs_organisation)
+
+
+    df_wiwb_all = {}
+    for data_source in DATA_SOURCES:
+        output_path = f"../01_data/p_raw_wiwb/{organisation}_{data_source}_raw_{start_date.strftime('%Y-%m-%d')}_{end_date.strftime('%Y-%m-%d')}.parquet"
+        if not os.path.exists(output_path):
+            print(f"Starting {organisation} - {data_source}")
+            current = start_date
+            df_wiwb = pd.Series(dtype="float64")
+
+            while current < end_date:
+                end = current + datetime.timedelta(days=10)
+                if end < MAX_END_DATE[data_source]:
+                    print(f"    downloading from {current} to {end}", end="\r")
+
+                    try:
+                        df_temp = wiwb.download_wiwb(data_source=DATA_SOURCES[data_source], 
+                                                    points=points, 
+                                                    start=current, 
+                                                    end=end, 
+                                                    extent=extent)
+                    except:
+                        continue
+
+                    if df_wiwb.empty:
+                        df_wiwb = df_temp.copy()
+                    else:
+                        df_wiwb = df_wiwb.append(df_temp)
+
+                current = end
+
+            df_wiwb_all[data_source] = df_wiwb.copy()
+
+    
+            pd.DataFrame(df_wiwb_all[data_source]).to_parquet(output_path)
+print('DONE')

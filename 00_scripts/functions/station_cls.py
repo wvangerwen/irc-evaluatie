@@ -148,12 +148,16 @@ class Stations_organisation():
                 #make sure negative values are masked
                 df_mask_single = (df_value_single<0) | (df_mask_single)
                 df_mask_single.name = station_id
+                df_mask_single.fillna(False, inplace=True) #HEA doesnt have equidistant timeseries, so missing data is not filtered
                 
                 df_value_dict[station_id] = df_value_single.copy()
                 df_mask_dict[station_id] = df_mask_single.copy()
 
             df_value = self.merge_df_datetime(df_value_dict)
             df_mask = self.merge_df_datetime(df_mask_dict)
+
+            df_mask.fillna(True, inplace=True) #Resample doesnt handle Nan values well. 
+
             locations=pd.read_excel(self.settings['metadata_file'])
 
 
@@ -264,7 +268,8 @@ class Stations_combined():
 
         for organisation in self.organisations:
             self.stations_org[organisation] = Stations_organisation(folder=self.folder,
-                                    organisation=organisation)
+                                    organisation=organisation,
+                                    settings=None)
 
 
     def load_stations_gdf(self):
@@ -310,7 +315,7 @@ class Stations_combined():
         return self.df_value[~self.df_mask]
 
 
-    def get_station(self, folder, row):
+    def get_station(self, row):
         """Get all timeseries of the station and combine them in one dataframe"""
         irc_types = [i for i in self.df_irc]
         dict_station = {}
@@ -322,7 +327,7 @@ class Stations_combined():
         #Combine all dataframes into one.
         df_timeseries = self.merge_df_datetime(dict_station)
 
-        return Station(folder, row, self.resample_rule, df=df_timeseries, irc_types=irc_types)
+        return Station(self.folder, row, self.resample_rule, df=df_timeseries, irc_types=irc_types)
 
 
     def __iter__(self):
@@ -330,7 +335,7 @@ class Stations_combined():
         for index, row in self.stations_df.iterrows():
             
             if row['ID'] in self.df_value.columns:
-                yield self.get_station(self.folder, row)
+                yield self.get_station(row)
             else:
                 print(f"{row['ID']} -- Missing timeseries")
                 pass
@@ -338,6 +343,7 @@ class Stations_combined():
     def __repr__(self):
         return '.'+' .'.join([i for i in dir(self) if not i.startswith('__')])
         
+
 class Wiwb_combined():
     def __init__(self, folder, settings):
         self.folder = folder
@@ -356,6 +362,12 @@ class Wiwb_combined():
         return out_path
 
 
+    @staticmethod
+    def merge_df_datetime(dict_df):
+        """Combine all dataframes in a dictionary into one single df."""
+        return reduce(lambda left,right: pd.merge(left,right,left_index=True, right_index=True, how='outer'), dict_df.values())   
+
+
     def resample(self, overwrite=True):
         """Resample wiwb values to hour and day data. Save to file"""
 
@@ -370,7 +382,11 @@ class Wiwb_combined():
 
             if np.all(cont) == True:
                 #Load raw values
-                df_value = pd.read_parquet(self.settings[irc_type]['raw_filepath']).unstack(level=1).droplevel(0, axis=1)
+                df_value_dict = {}
+                for raw_filepath in self.settings[irc_type]['raw_filepaths']:
+                    df_value_dict[raw_filepath] = pd.read_parquet(raw_filepath).unstack(level=1).droplevel(0, axis=1)
+
+                df_value = self.merge_df_datetime(df_value_dict)
 
                 for resample_rule in ['h', 'd']:
                     #Resample
