@@ -98,7 +98,69 @@ class Stations_organisation():
 
             df_mask = df_flag != 0
 
+        if self.organisation=='HEA':
+            resample_rule_hea = {'5m.Totaal.O':'5min',
+                                'Totals.5m.O':'5min',
+                                'Totaal.60.O':'h'}
+
+            df_mask_dict = {}
+            df_value_dict = {}
+            for raw_fp in Path(raw_filepath).glob('*csv'):
+
+                #Get metadata from headers of csv
+                df_meta = pd.read_csv(raw_fp, sep=sep, nrows=8).set_index('ts_id')
+                station_id = df_meta.loc['site_no'].values[0]
+                station_param = df_meta.loc['ts_name'].values[0]
+
+                #Load timeseries
+                df = pd.read_csv(raw_fp, sep=sep, skiprows=skiprows)#, parse_dates=[date_col])
+
+                df.rename({date_col:'datetime', 
+                            'Value':'value',
+                            'Quality Code':'flag'}, 
+                            inplace=True,axis=1)
+
+
+                #Set datetime as index
+                df['datetime'] = pd.to_datetime(df['datetime'], format='%d-%m-%Y %H:%M:%S')
+                df.set_index('datetime', inplace=True)
+                df.drop('Timeseries Comment', axis=1, inplace=True)
+
+                #Resample
+                df = df.resample(resample_rule_hea[station_param]).sum()
+
+
+                #Split into mask and value series
+                df_value_single = df['value'].copy() # values
+                df_value_single.name = station_id
+
+                # Create a mask df from the flags
+                df_mask_single = df['flag'].copy() # flags
+
+                #Replace string values with mask, to identify which timeseries we do use. 
+                masked_values = {200: False,
+                                '0': True}
+                df_mask_single.replace(masked_values, inplace=True)
+
+                #make sure negative values are masked
+                df_mask_single = (df_value_single<0) | (df_mask_single)
+                df_mask_single.name = station_id
+                
+                df_value_dict[station_id] = df_value_single.copy()
+                df_mask_dict[station_id] = df_mask_single.copy()
+
+            df_value = self.merge_df_datetime(df_value_dict)
+            df_mask = self.merge_df_datetime(df_mask_dict)
+            locations=None
+
         return df_mask, df_value, locations
+
+
+    @staticmethod
+    def merge_df_datetime(dict_df):
+        """Combine all dataframes in a dictionary into one single df."""
+        return reduce(lambda left,right: pd.merge(left,right,left_index=True, right_index=True, how='outer'), dict_df.values())   
+
 
     def set_out_path(self):
         """set output paths of resampled dataframes"""
@@ -167,6 +229,10 @@ class Stations_organisation():
                 print(f'Update ground stations gpkg -- {self.folder.input.ground_stations.path}')
                 stations_df.to_file(self.folder.input.ground_stations.path, driver='GPKG')     
 
+                
+    def __repr__(self):
+        return '.'+' .'.join([i for i in dir(self) if not i.startswith('__')])
+        
 
 class Stations_combined():
     """Class that combines the resampled timeseries of all organisations."""
@@ -188,7 +254,8 @@ class Stations_combined():
         return gdf[gdf['use']==True]
 
 
-    def merge_df_datetime(self, dict_df):
+    @staticmethod
+    def merge_df_datetime(dict_df):
         """Combine all dataframes in a dictionary into one single df."""
         return reduce(lambda left,right: pd.merge(left,right,left_index=True, right_index=True, how='outer'), dict_df.values())   
 

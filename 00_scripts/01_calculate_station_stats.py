@@ -1,8 +1,8 @@
 # %%
+from time import strftime
 import functions.folders as folders
 import functions.station_cls as station_cls
 import functions.station_statistics as station_statistics
-import functions.fews_xml_reader as fews_xml_reader
 import importlib
 importlib.reload(folders)
 importlib.reload(station_cls) #Reload folders to skip kernel reload.
@@ -36,7 +36,12 @@ ORG_SETTINGS = {'HHNK':
                 'HDSR':
                     {'raw_filepath': folder.input.paths['station']['raw'].full_path('HDSR_neerslagdata_2022_5min.xml')},
                 'WL':
-                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('WL_neerslagdata_202205141515_5min.xml')}
+                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('WL_neerslagdata_202205141515_5min.xml')},
+                'HEA':
+                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('HEA_P_2022'),
+                    'skiprows': 9,
+                    'sep': ';',
+                    'date_col':'Timestamp'},
                 }
 
 WIWB_SETTINGS = {'irc_early':
@@ -49,12 +54,13 @@ WIWB_SETTINGS = {'irc_early':
 # Resample data
 
 #Station 
-for organisation in ORG_SETTINGS:
+# for organisation in ORG_SETTINGS:
+for organisation in ['HEA']:
     stations_organisation = station_cls.Stations_organisation(folder=folder,          
                                 organisation=organisation)
 
     #Resample timeseries to hour and day values.
-    locations = stations_organisation.resample(**ORG_SETTINGS[organisation], overwrite=False)
+    locations = stations_organisation.resample(**ORG_SETTINGS[organisation], overwrite=True)
 
     #Add locations from xml to the gpkg
     stations_organisation.add_xml_locations_to_gpkg(locations)
@@ -68,8 +74,8 @@ wiwb_combined.resample(overwrite=True)
 
 #Combine stations into one df
 organisations=['HHNK', 'HDSR', 'WL']
-
-resample_rule='d'
+# organisations=['HDSR']
+resample_rule='h'
 
 #Initialize stations
 wiwb_combined = station_cls.Wiwb_combined(folder=folder, wiwb_settings=WIWB_SETTINGS) #This can load the wiwb timeseries
