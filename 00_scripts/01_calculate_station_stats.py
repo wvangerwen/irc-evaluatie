@@ -11,6 +11,7 @@ import geopandas as gpd
 import os
 import matplotlib.pyplot as plt
 import re
+import itertools
 import numpy as np
 from functools import reduce
 
@@ -48,6 +49,8 @@ WIWB_SETTINGS = {'irc_early':
                     {'raw_filepath':folder.input.paths['wiwb']['raw'].full_path('HHNK_HDSR_WL_irc_early_2022-05-21_2022-05-21.parquet')},
                 'irc_realtime':
                     {'raw_filepath':folder.input.paths['wiwb']['raw'].full_path('HHNK_HDSR_WL_irc_realtime_2022-05-21_2022-05-21.parquet')},
+                #'irc_final':
+                #    {'raw_filepath':folder.input.paths['wiwb']['raw'].full_path('HHNK_HDSR_WL_irc_realtime_2022-05-21_2022-05-21.parquet')},
                 }
 
 
@@ -81,39 +84,41 @@ wiwb_combined.resample(overwrite=True)
 
 #Combine stations into one df
 organisations=['HHNK', 'HDSR', 'WL']
-# organisations=['HDSR']
-resample_rule='h'
-
-#Initialize stations
-wiwb_combined = station_cls.Wiwb_combined(folder=folder, wiwb_settings=WIWB_SETTINGS) #This can load the wiwb timeseries
-stations_combined = station_cls.Stations_combined(folder=folder, organisations=organisations, wiwb_combined=wiwb_combined, resample_rule=resample_rule)
-stations_combined.load_stations()
-stations_combined.load_wiwb()
-
-
-#Calculate statistics per station.
-stations_stats = {}
-for station in stations_combined:
-    # if station.code == 'MPN-A-4156': #Testen met 1 station.
-    if True:
-        stations_stats[station.code] = station_statistics.StationStats(station)
-        # break
-
-# Combine statistics of all stations in geodataframe
 
 gdf = stations_combined.stations_df.copy()
 gdf.set_index('ID', inplace=True)
 
+for resample_rule in ["d", "h"]:
 
-for code in stations_stats:
-    station_stats = stations_stats[code]
+    #Initialize stations
+    wiwb_combined = station_cls.Wiwb_combined(folder=folder, wiwb_settings=WIWB_SETTINGS) #This can load the wiwb timeseries
+    stations_combined = station_cls.Stations_combined(folder=folder, organisations=organisations, wiwb_combined=wiwb_combined, resample_rule=resample_rule)
+    stations_combined.load_stations()
+    stations_combined.load_wiwb()
 
-    for irc_type in station_stats.station.irc_types:
-        gdf.loc[code, f'rel_bias_{irc_type}'] = station_stats.irc_stats[irc_type].RelBiasTotal
 
+    #Calculate statistics per station.
+    stations_stats = {}
+    for station in stations_combined:
+        # if station.code == 'MPN-A-4156': #Testen met 1 station.
+        if True:
+            stations_stats[station.code] = station_statistics.StationStats(station)
+            # break
 
-#  plot some station statistics of indiviual station
-for code in stations_stats:
-    station_stats = stations_stats[code]
-    station_stats.plot_scatter(irc_type = 'irc_early')
+    # Combine statistics of all stations in geodataframe
+    for code in stations_stats:
+        station_stats = stations_stats[code]
+
+        for irc_type in station_stats.station.irc_types:
+            gdf.loc[code, f'rel_bias_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].RelBiasTotal
     
+    #  plot some station statistics of indiviual station
+    for irc_type in WIWB_SETTINGS.keys():
+        for code in stations_stats:
+            station_stats = stations_stats[code]
+            fig = station_stats.plot_scatter(irc_type=irc_type)
+            fig.savefig(f"../02_img/{irc_type}/{code}_{resample_rule}.png")
+
+gdf.to_file(f"../01_data/ground_stations_stats.gpkg", driver="GPKG")
+    
+# %%

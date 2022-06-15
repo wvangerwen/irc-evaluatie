@@ -44,8 +44,8 @@ class StationStats():
         """Scatterplot comparing radar composite to ground station measurements"""
         #Init figure
         
-        fig, ax=plt.subplots(figsize=[10,6])
-        ax=plt.gca()
+        fig, ax = plt.subplots(figsize=[10,6])
+        ax = plt.gca()
 
         # Plot values
         scatter = plt.scatter(x=self.df['station'], y=self.df[irc_type], c=self.df['class'])
@@ -81,7 +81,7 @@ class StationStats():
             timestr='Dag'
         plt.xlabel(f'{timestr}som regenmeter [mm]', fontsize=16)
         plt.ylabel(f'{timestr}som radar [mm]', fontsize=16)
- 
+        return fig
 
     def create_classes(self):
         """Table used to classify the station p values"""
