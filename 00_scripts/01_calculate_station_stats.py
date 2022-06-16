@@ -58,6 +58,7 @@ WIWB_SETTINGS = {'irc_early':
 
 #Station 
 for organisation in ORG_SETTINGS:
+# for organisation in ['HHNK']:
     stations_organisation = station_cls.Stations_organisation(folder=folder,          
                                 organisation=organisation,
                                 settings=ORG_SETTINGS[organisation])
@@ -125,3 +126,5 @@ for code in stations_stats:
             fig.savefig(f"../02_img/{irc_type}/{code}_{resample_rule}.png")
             
             plt.close(fig)
+
+# %%

@@ -58,7 +58,7 @@ class Stations_organisation():
                         inplace=True,axis=1)
 
             #Set datetime as index
-            df['datetime'] = pd.to_datetime(df['datetime'])
+            df['datetime'] = pd.to_datetime(df['datetime']) - pd.Timedelta(f'01:00:00') #change time to utc
             df.set_index('datetime', inplace=True)
 
             df=df.iloc[1:] #Skip first row.
