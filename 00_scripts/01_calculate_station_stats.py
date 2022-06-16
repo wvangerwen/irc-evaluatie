@@ -2,7 +2,6 @@
 import functions.folders as folders
 import functions.station_cls as station_cls
 import functions.station_statistics as station_statistics
-import functions.fews_xml_reader as fews_xml_reader
 import importlib
 importlib.reload(folders)
 importlib.reload(station_cls) #Reload folders to skip kernel reload.
@@ -37,48 +36,55 @@ ORG_SETTINGS = {'HHNK':
                 'HDSR':
                     {'raw_filepath': folder.input.paths['station']['raw'].full_path('HDSR_neerslagdata_2022_5min.xml')},
                 'WL':
-                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('WL_neerslagdata_202205141515_5min.xml')}
+                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('WL_neerslagdata_202205141515_5min.xml')},
+                'HEA':
+                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('HEA_P_2022'),
+                    'skiprows': 9,
+                    'sep': ';',
+                    'date_col':'Timestamp',
+                    'metadata_file': folder.input.full_path('HEA_P_metadata2.xlsx'),},
                 }
 
 WIWB_SETTINGS = {'irc_early':
-                    {'raw_filepath':folder.input.paths['wiwb']['raw'].full_path('HHNK_HDSR_WL_irc_early_2022-05-21_2022-05-21.parquet')},
+                    {'raw_filepaths':folder.input.paths['wiwb']['raw'].pl.glob('*irc_early*.parquet')},
                 'irc_realtime':
-                    {'raw_filepath':folder.input.paths['wiwb']['raw'].full_path('HHNK_HDSR_WL_irc_realtime_2022-05-21_2022-05-21.parquet')},
-                #'irc_final':
-                #    {'raw_filepath':folder.input.paths['wiwb']['raw'].full_path('HHNK_HDSR_WL_irc_realtime_2022-05-21_2022-05-21.parquet')},
+                    {'raw_filepaths':folder.input.paths['wiwb']['raw'].pl.glob('*irc_realtime*.parquet')},
+                'irc_final':
+                   {'raw_filepaths':folder.input.paths['wiwb']['raw'].pl.glob('*irc_final*.parquet')},
                 }
 
-
+# %%
 # Resample data
 
 #Station 
 for organisation in ORG_SETTINGS:
     stations_organisation = station_cls.Stations_organisation(folder=folder,          
-                                organisation=organisation)
+                                organisation=organisation,
+                                settings=ORG_SETTINGS[organisation])
 
     #Resample timeseries to hour and day values.
-    locations = stations_organisation.resample(**ORG_SETTINGS[organisation], overwrite=False)
+    locations = stations_organisation.resample(overwrite=False)
 
     #Add locations from xml to the gpkg
-    stations_organisation.add_xml_locations_to_gpkg(locations)
+    stations_organisation.add_locations_to_gpkg(locations)
 
 #Wiwb
-wiwb_combined = station_cls.Wiwb_combined(folder=folder, wiwb_settings=WIWB_SETTINGS)
+wiwb_combined = station_cls.Wiwb_combined(folder=folder, settings=WIWB_SETTINGS)
 wiwb_combined.resample(overwrite=True)
 
 
-# %% LOAD ALL TIMESERIES
 
+#%%
 #Combine stations into one df
-organisations=['HHNK', 'HDSR', 'WL']
+organisations=['HHNK', 'HDSR', 'WL', 'HEA']
 
-gdf = stations_combined.stations_df.copy()
+gdf = station_cls.Stations_combined(folder=folder, organisations=[], wiwb_combined=None, resample_rule='d').stations_df.copy()
 gdf.set_index('ID', inplace=True)
 
 for resample_rule in ["d", "h"]:
 
     #Initialize stations
-    wiwb_combined = station_cls.Wiwb_combined(folder=folder, wiwb_settings=WIWB_SETTINGS) #This can load the wiwb timeseries
+    wiwb_combined = station_cls.Wiwb_combined(folder=folder, settings=WIWB_SETTINGS) #This can load the wiwb timeseries
     stations_combined = station_cls.Stations_combined(folder=folder, organisations=organisations, wiwb_combined=wiwb_combined, resample_rule=resample_rule)
     stations_combined.load_stations()
     stations_combined.load_wiwb()
@@ -92,20 +98,30 @@ for resample_rule in ["d", "h"]:
             stations_stats[station.code] = station_statistics.StationStats(station)
             # break
 
-    # Combine statistics of all stations in geodataframe
+# %%
+# Combine statistics of all stations in geodataframe
+for resample_rule in ["d", "h"]:
+
     for code in stations_stats:
         station_stats = stations_stats[code]
+
 
         for irc_type in station_stats.station.irc_types:
             gdf.loc[code, f'rel_bias_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].RelBiasTotal
     
+# Save to file
+gdf.to_file(f"../01_data/ground_stations_stats.gpkg", driver="GPKG")
+
+# %%
+plt.ioff()
+
+for code in stations_stats:
+    print(code)
+    for resample_rule in ["d", "h"]:
     #  plot some station statistics of indiviual station
-    for irc_type in WIWB_SETTINGS.keys():
-        for code in stations_stats:
+        for irc_type in WIWB_SETTINGS.keys():
             station_stats = stations_stats[code]
             fig = station_stats.plot_scatter(irc_type=irc_type)
             fig.savefig(f"../02_img/{irc_type}/{code}_{resample_rule}.png")
-
-gdf.to_file(f"../01_data/ground_stations_stats.gpkg", driver="GPKG")
-    
-# %%
+            
+            plt.close(fig)

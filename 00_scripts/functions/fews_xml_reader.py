@@ -37,6 +37,10 @@ def fews_xml_to_df(timeseries_source):
 
     locations = {}
 
+    #Get timezone from xml
+    for i in tree.xpath('//fews:timeZone', namespaces=nsmap):
+        tz = int(float(i.text))
+
     for s in series:
         location = Location_header_xml(s)
         # location and parameter names are in the header on the series
@@ -46,6 +50,7 @@ def fews_xml_to_df(timeseries_source):
         series_df = pd.read_xml(etree.tostring(s), xpath='//fews:series/fews:event', namespaces=nsmap)
         # combine the date and time columns into a single datetime and set it as the index for the dataframe
         series_df['datetime'] = pd.to_datetime((series_df['date'] + ' ' + series_df['time']))
+        series_df['datetime'] -= pd.Timedelta(f'0{tz}:00:00') #change time to utc
         series_df.set_index(['datetime'], inplace=True)
         # take the value and flag columns and add them to the dataframe being constructed
         df_value[location.loc_id, location.parameter_id] = series_df['value']
@@ -58,5 +63,4 @@ def fews_xml_to_df(timeseries_source):
     # turn the columns labeled with tuples into a proper multi-index on the dataframe
     df_value.columns = pd.MultiIndex.from_tuples(df_value.columns, names=['location', 'parameter'])
     df_flag.columns = pd.MultiIndex.from_tuples(df_flag.columns, names=['location', 'parameter'])
-
     return df_value, df_flag, locations
