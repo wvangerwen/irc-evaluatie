@@ -57,14 +57,13 @@ WIWB_SETTINGS = {'irc_early':
 # Resample data
 
 #Station 
-# for organisation in ORG_SETTINGS:
-for organisation in ['HEA']:
+for organisation in ORG_SETTINGS:
     stations_organisation = station_cls.Stations_organisation(folder=folder,          
                                 organisation=organisation,
                                 settings=ORG_SETTINGS[organisation])
 
     #Resample timeseries to hour and day values.
-    locations = stations_organisation.resample(overwrite=True)
+    locations = stations_organisation.resample(overwrite=False)
 
     #Add locations from xml to the gpkg
     stations_organisation.add_locations_to_gpkg(locations)
@@ -73,22 +72,7 @@ for organisation in ['HEA']:
 wiwb_combined = station_cls.Wiwb_combined(folder=folder, settings=WIWB_SETTINGS)
 wiwb_combined.resample(overwrite=True)
 
-# %%
-self=stations_organisation
 
-df_mask, df_value, locations = self.load_ts_raw()
-
-for resample_rule in ['h', 'd']:
-    #Resample
-    df_value_resampled= pd.DataFrame(df_value.resample(resample_rule).sum())
-    df_mask_resampled = pd.DataFrame(df_mask.resample(resample_rule).sum())
-
-    #Recreate mask
-    df_mask_resampled = df_mask_resampled != 0
-
-    #Save to file
-    df_value_resampled.to_parquet(self.out_path['value'][resample_rule])
-    df_mask_resampled.to_parquet(self.out_path['mask'][resample_rule])
 
 #%%
 #Combine stations into one df
@@ -114,54 +98,30 @@ for resample_rule in ["d", "h"]:
             stations_stats[station.code] = station_statistics.StationStats(station)
             # break
 
-    # Combine statistics of all stations in geodataframe
+# %%
+# Combine statistics of all stations in geodataframe
+for resample_rule in ["d", "h"]:
+
     for code in stations_stats:
         station_stats = stations_stats[code]
 
-# %%
+
         for irc_type in station_stats.station.irc_types:
             gdf.loc[code, f'rel_bias_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].RelBiasTotal
     
-    #  plot some station statistics of indiviual station
-    # for irc_type in WIWB_SETTINGS.keys():
-    for irc_type in ['irc_final']: 
-        for code in stations_stats:
-            station_stats = stations_stats[code]
-            fig = station_stats.plot_scatter(irc_type=irc_type) #TODO hide fig
-            fig.savefig(f"../02_img/{irc_type}/{code}_{resample_rule}.png")
-
+# Save to file
 gdf.to_file(f"../01_data/ground_stations_stats.gpkg", driver="GPKG")
-    
-# %%
-self = stations_combined
-
-for index, row in self.stations_df.iterrows():
-    # if row['ID'] in self.df_value.columns:
-        # self.get_station(self.folder, row)
-
-
-
-    irc_types = [i for i in self.df_irc]
-    dict_station = {}
-    dict_station['station'] = self.df[row['ID']].rename('station')
-    for irc_type in irc_types:
-        dict_station[irc_type] = self.df_irc[irc_type][row['WEERGAVENAAM']].rename(irc_type)
-    print(dict_station.keys())
-
-    dict_station['mask'] = self.df_mask[row['ID']].rename('mask')
-
 
 # %%
-if True:
-        dict_values={}
-        dict_mask={}
-        for organisation in self.stations_org:
-            stat = self.stations_org[organisation]
-            stat.load(resample_rule=self.resample_rule)
+plt.ioff()
 
-            dict_values[stat.organisation] = stat.df_value
-            dict_mask[stat.organisation] = stat.df_mask
-
-        self.df_value = self.merge_df_datetime(dict_df=dict_values)
-        self.df_mask = self.merge_df_datetime(dict_df=dict_mask)
-        self.df_mask = self.df_mask==True #Fill nanvalues.
+for code in stations_stats:
+    print(code)
+    for resample_rule in ["d", "h"]:
+    #  plot some station statistics of indiviual station
+        for irc_type in WIWB_SETTINGS.keys():
+            station_stats = stations_stats[code]
+            fig = station_stats.plot_scatter(irc_type=irc_type)
+            fig.savefig(f"../02_img/{irc_type}/{code}_{resample_rule}.png")
+            
+            plt.close(fig)

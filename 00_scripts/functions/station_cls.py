@@ -148,7 +148,6 @@ class Stations_organisation():
                 #make sure negative values are masked
                 df_mask_single = (df_value_single<0) | (df_mask_single)
                 df_mask_single.name = station_id
-                df_mask_single.fillna(False, inplace=True) #HEA doesnt have equidistant timeseries, so missing data is not filtered
                 
                 df_value_dict[station_id] = df_value_single.copy()
                 df_mask_dict[station_id] = df_mask_single.copy()
@@ -156,7 +155,13 @@ class Stations_organisation():
             df_value = self.merge_df_datetime(df_value_dict)
             df_mask = self.merge_df_datetime(df_mask_dict)
 
-            df_mask.fillna(True, inplace=True) #Resample doesnt handle Nan values well. 
+            #Fill nan values so resample works properly
+            if self.organisation=='HEA':
+                fillna_value = False #HEA doesnt have equidistant timeseries, so missing data is not filtered
+            else:
+                fillna_value = True
+            df_mask.fillna(fillna_value, inplace=True) #Resample doesnt handle Nan values well. 
+
 
             locations=pd.read_excel(self.settings['metadata_file'])
 
@@ -394,3 +399,8 @@ class Wiwb_combined():
 
                     #Save to file
                     df_value_resampled.to_parquet(self.out_path[irc_type][resample_rule])
+
+
+    def __repr__(self):
+        return '.'+' .'.join([i for i in dir(self) if not i.startswith('__')])
+        
