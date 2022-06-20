@@ -11,7 +11,14 @@ class IrcStats():
         self.irc_mean = stationstats.df[irc_type].mean()
         self.CV = round(stationstats.df['station'].std()/self.gauge_mean, 2) #?
         self.BiasTotal = self.residuals.mean()
-        self.RelBiasTotal = round(self.BiasTotal/self.gauge_mean *100,2) #Relative bias %.
+        self.RelBiasTotal = round(self.BiasTotal/self.gauge_mean * 100, 1) #Relative bias %.
+        self.gauge_cumu = stationstats.df['station'].cumsum()
+        self.irc_cumu = stationstats.df[irc_type].cumsum()
+        self.biastotalcumu = (self.irc_cumu - self.gauge_cumu).mean()
+        self.relbiastotalcumu =  round(self.biastotalcumu / self.gauge_cumu.mean() * 100, 1)
+        self.corr = round(stationstats.df['station'].corr(stationstats.df[irc_type]), 2)
+        self.stdev = self.residuals.std()
+
 
     def __repr__(self):
         return '.'+' .'.join([i for i in dir(self) if not i.startswith('__')])

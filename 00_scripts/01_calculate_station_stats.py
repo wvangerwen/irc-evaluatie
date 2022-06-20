@@ -45,10 +45,10 @@ ORG_SETTINGS = {'HHNK':
                     'metadata_file': folder.input.full_path('HEA_P_metadata2.xlsx'),},
                 }
 
-WIWB_SETTINGS = {'irc_early':
-                    {'raw_filepaths':folder.input.paths['wiwb']['raw'].pl.glob('*irc_early*.parquet')},
-                'irc_realtime':
+WIWB_SETTINGS = {'irc_realtime':
                     {'raw_filepaths':folder.input.paths['wiwb']['raw'].pl.glob('*irc_realtime*.parquet')},
+                 'irc_early':
+                    {'raw_filepaths':folder.input.paths['wiwb']['raw'].pl.glob('*irc_early*.parquet')},
                 'irc_final':
                    {'raw_filepaths':folder.input.paths['wiwb']['raw'].pl.glob('*irc_final*.parquet')},
                 }
@@ -108,8 +108,11 @@ for resample_rule in ["d", "h"]:
 
 
         for irc_type in station_stats.station.irc_types:
-            gdf.loc[code, f'rel_bias_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].RelBiasTotal
-    
+            gdf.loc[code, f'stat_rel_bias_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].RelBiasTotal
+            gdf.loc[code, f'stat_rel_bias_cumu_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].relbiastotalcumu
+            gdf.loc[code, f'stat_stdev_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].stdev
+            gdf.loc[code, f'stat_corr_{irc_type}'] = station_stats.irc_stats[irc_type].corr
+
 # Save to file
 gdf.to_file(f"../01_data/ground_stations_stats.gpkg", driver="GPKG")
 
