@@ -82,6 +82,7 @@ organisations=['HHNK', 'HDSR', 'WL', 'HEA']
 gdf = station_cls.Stations_combined(folder=folder, organisations=[], wiwb_combined=None, resample_rule='d').stations_df.copy()
 gdf.set_index('ID', inplace=True)
 
+stations_stats = {}
 for resample_rule in ["d", "h"]:
 
     #Initialize stations
@@ -92,19 +93,20 @@ for resample_rule in ["d", "h"]:
 
 
     #Calculate statistics per station.
-    stations_stats = {}
+    stations_stats[resample_rule]={}
+
     for station in stations_combined:
         # if station.code == 'MPN-A-4156': #Testen met 1 station.
         if True:
-            stations_stats[station.code] = station_statistics.StationStats(station)
+            stations_stats[resample_rule][station.code] = station_statistics.StationStats(station)
             # break
 
 # %%
 # Combine statistics of all stations in geodataframe
 for resample_rule in ["d", "h"]:
 
-    for code in stations_stats:
-        station_stats = stations_stats[code]
+    for code in stations_stats[resample_rule]:
+        station_stats = stations_stats[resample_rule][code]
 
 
         for irc_type in station_stats.station.irc_types:
@@ -119,12 +121,12 @@ gdf.to_file(f"../01_data/ground_stations_stats.gpkg", driver="GPKG")
 # %%
 plt.ioff()
 
-for code in stations_stats:
+for code in stations_stats[resample_rule]:
     print(code)
     for resample_rule in ["d", "h"]:
     #  plot some station statistics of indiviual station
         for irc_type in WIWB_SETTINGS.keys():
-            station_stats = stations_stats[code]
+            station_stats = stations_stats[resample_rule][code]
             fig = station_stats.plot_scatter(irc_type=irc_type)
             fig.savefig(f"../02_img/{irc_type}/{code}_{resample_rule}.png")
             
