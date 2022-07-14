@@ -165,6 +165,40 @@ class Stations_organisation():
 
             locations=pd.read_excel(self.settings['metadata_file'])
 
+        if self.organisation=='WF':
+
+            df = pd.read_excel(self.settings['raw_filepath'], skiprows=self.settings['skiprows'], engine='openpyxl')#, parse_dates=[date_col])
+
+            df.loc[2, self.settings['date_col']] = self.settings['date_col']
+            df.columns=df.iloc[2]
+
+            #Get location information (only weergavenaam and ID. We need xy..)
+            meta_rows=[0,1,2]
+            locations = df.loc[meta_rows].T[[1,2]].iloc[1:]
+            locations.rename({1:'WEERGAVENAAM',
+                            2:'ID'}, axis=1, inplace=True)
+
+            df.drop([0,1,2], axis=0, inplace=True)
+
+            df.rename({self.settings['date_col']:'datetime', 
+                        'P.meting.1m':'value',
+                        'P.meting.1m quality':'flag'}, 
+                        inplace=True,axis=1)
+
+
+            #Set datetime as index
+            df['datetime'] = pd.to_datetime(df['datetime'].apply(lambda x: x[3:]), format='%d-%m-%Y %H:%M')
+            df.set_index('datetime', inplace=True)
+
+            #Convert CET/CEST to UTC
+            df = df.tz_localize('CET', ambiguous="infer").tz_convert('UTC')
+
+            df_value=df
+            df_value.astype(float)
+
+            # Create mask and make sure negative values are masked
+            df_mask = df_value.notna()
+            df_mask = (df_value<0) | (df_mask)
 
         return df_mask, df_value, locations
 
@@ -246,7 +280,7 @@ class Stations_organisation():
                 locations.rename({'site_name':'WEERGAVENAAM', 
                                             'Site_id':'ID',}, 
                                             inplace=True,axis=1)
-                locations['organisation'] = 'HEA'
+                locations['organisation'] = self.organisation
                 locations['use']=True
                 locations = hrt.df_add_geometry_to_gdf(locations, 'geometry')
                 stations_df = pd.merge(stations_df, locations, how='outer')[stations_df.columns]

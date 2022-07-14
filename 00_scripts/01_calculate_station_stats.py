@@ -1,4 +1,11 @@
 # %%
+
+for x in ['C:/Users/wvangerwen/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/hhnk_threedi_plugin/external-dependencies',
+ 'C:/Users/wvangerwen/AppData/Roaming/QGIS/QGIS3/profiles/default/python',]:
+    try:
+        sys.path.remove(x)
+    except:
+        print(f'not in path: {x}')
 import functions.folders as folders
 import functions.station_cls as station_cls
 import functions.station_statistics as station_statistics
@@ -28,21 +35,26 @@ folder = folders.Folders(os.pardir) #create folder structure from parent dir.
 stations_df = gpd.read_file(folder.input.ground_stations.path)
 
 
-ORG_SETTINGS = {'HHNK':
-                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('HHNK_neerslagmeters_20220101_20220513_1min.csv'),
+ORG_SETTINGS = {
+                # 'HHNK':
+                #     {'raw_filepath': folder.input.paths['station']['raw'].full_path('HHNK_neerslagmeters_20220101_20220513_1min.csv'),
+                #     'skiprows': 0,
+                #     'sep': ';',
+                #     'date_col':'Unnamed: 0'},
+                # 'HDSR':
+                #     {'raw_filepath': folder.input.paths['station']['raw'].full_path('HDSR_neerslagdata_2022_5min.xml')},
+                # 'WL':
+                #     {'raw_filepath': folder.input.paths['station']['raw'].full_path('WL_neerslagdata_202205141515_5min.xml')},
+                # 'HEA':
+                #     {'raw_filepath': folder.input.paths['station']['raw'].full_path('HEA_P_2022'),
+                #     'skiprows': 9,
+                #     'sep': ';',
+                #     'date_col':'Timestamp',
+                #     'metadata_file': folder.input.full_path('HEA_P_metadata2.xlsx'),},
+                'WF':
+                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('wf_neerslag.xlsx'),
                     'skiprows': 0,
-                    'sep': ';',
-                    'date_col':'Unnamed: 0'},
-                'HDSR':
-                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('HDSR_neerslagdata_2022_5min.xml')},
-                'WL':
-                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('WL_neerslagdata_202205141515_5min.xml')},
-                'HEA':
-                    {'raw_filepath': folder.input.paths['station']['raw'].full_path('HEA_P_2022'),
-                    'skiprows': 9,
-                    'sep': ';',
-                    'date_col':'Timestamp',
-                    'metadata_file': folder.input.full_path('HEA_P_metadata2.xlsx'),},
+                    'date_col':'CET/CEST'},
                 }
 
 WIWB_SETTINGS = {'irc_realtime':
@@ -77,7 +89,7 @@ wiwb_combined.resample(overwrite=True)
 
 #%%
 #Combine stations into one df
-organisations=['HHNK', 'HDSR', 'WL', 'HEA']
+organisations=['HHNK', 'HDSR', 'WL', 'HEA', 'WL']
 
 gdf = station_cls.Stations_combined(folder=folder, organisations=[], wiwb_combined=None, resample_rule='d').stations_df.copy()
 gdf.set_index('ID', inplace=True)
@@ -90,7 +102,6 @@ for resample_rule in ["d", "h"]:
     stations_combined = station_cls.Stations_combined(folder=folder, organisations=organisations, wiwb_combined=wiwb_combined, resample_rule=resample_rule)
     stations_combined.load_stations()
     stations_combined.load_wiwb()
-
 
     #Calculate statistics per station.
     stations_stats[resample_rule]={}
