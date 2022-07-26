@@ -89,7 +89,7 @@ wiwb_combined.resample(overwrite=True)
 
 #%%
 #Combine stations into one df
-organisations=['HHNK', 'HDSR', 'WL', 'HEA', 'WL']
+organisations=['HHNK', 'HDSR', 'WL', 'HEA', 'WF']
 
 gdf = station_cls.Stations_combined(folder=folder, organisations=[], wiwb_combined=None, resample_rule='d').stations_df.copy()
 gdf.set_index('ID', inplace=True)
