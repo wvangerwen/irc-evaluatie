@@ -5,19 +5,31 @@ import re
 class IrcStats():
     """Statistics per irc type"""
     def __init__(self, stationstats, irc_type):
+        self.stationstats = stationstats
+
         self.irc_type = irc_type
         self.residuals = stationstats.df[irc_type] - stationstats.df['station']
         self.gauge_mean = stationstats.df['station'].mean()
         self.irc_mean = stationstats.df[irc_type].mean()
-        self.CV = round(stationstats.df['station'].std()/self.gauge_mean, 2) #?
+         #?
         self.BiasTotal = self.residuals.mean()
-        self.RelBiasTotal = round(self.BiasTotal/self.gauge_mean * 100, 1) #Relative bias %.
         self.gauge_cumu = stationstats.df['station'].cumsum()
         self.irc_cumu = stationstats.df[irc_type].cumsum()
         self.biastotalcumu = (self.irc_cumu - self.gauge_cumu).mean()
-        self.relbiastotalcumu =  round(self.biastotalcumu / self.gauge_cumu.mean() * 100, 1)
         self.corr = round(stationstats.df['station'].corr(stationstats.df[irc_type]), 2)
         self.stdev = self.residuals.std()
+
+        if self.gauge_mean==0:
+            self.CV = 0
+            self.RelBiasTotal = 0   
+        else: 
+            self.CV = round(stationstats.df['station'].std()/self.gauge_mean, 2)
+            self.RelBiasTotal = round(self.BiasTotal/self.gauge_mean * 100, 1) #Relative bias %.
+            
+        if self.gauge_cumu.mean()==0:
+            self.relbiastotalcumu = 0
+        else:
+            self.relbiastotalcumu =  round(self.biastotalcumu / self.gauge_cumu.mean() * 100, 1)
 
 
     def __repr__(self):

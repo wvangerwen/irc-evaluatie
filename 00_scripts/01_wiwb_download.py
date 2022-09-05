@@ -1,4 +1,13 @@
 # %%
+import sys
+for x in ['C:/Users/wvangerwen/AppData/Roaming/3Di/QGIS3/profiles/default/python/plugins/hhnk_threedi_plugin/external-dependencies',
+ 'C:/Users/wvangerwen/AppData/Roaming/3Di/QGIS3/profiles/default/python',
+ 'C:/Users/wvangerwen/AppData/Roaming/3Di/QGIS3/profiles/default/python/plugins/ThreeDiToolbox/deps']:
+    try:
+        sys.path.remove(x)
+    except:
+        print(f'not in path: {x}')
+
 import functions.wiwb as wiwb
 import pandas as pd
 import plotly.express as px
@@ -30,15 +39,14 @@ MAX_END_DATE = {'irc_realtime':datetime.datetime.now() - datetime.timedelta(hour
                 'irc_early':datetime.datetime.now() - datetime.timedelta(days=4),
                 'irc_final':datetime.datetime.now() - datetime.timedelta(days=30)}
 
-ORGANISATIONS=['HHNK', 'HDSR', 'WL', 'HEA']
-# ORGANISATIONS=['HEA']
+ORGANISATIONS=['HHNK', 'HDSR', 'WL', 'HEA', 'WF']
+ORGANISATIONS=['WF']
 
 # %%
 
 for organisation in ORGANISATIONS:
     locs_organisation = locs[locs['organisation']==organisation]
     points, extent = wiwb.get_points_from_gdf(locs_organisation)
-
 
     df_wiwb_all = {}
     for data_source in DATA_SOURCES:

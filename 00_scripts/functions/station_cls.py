@@ -192,12 +192,13 @@ class Stations_organisation():
 
             #Convert CET/CEST to UTC
             df = df.tz_localize('CET', ambiguous="infer").tz_convert('UTC')
+            df = df.tz_localize(None)  #remove tz info so we can merge. 
 
             df_value=df
             df_value.astype(float)
 
             # Create mask and make sure negative values are masked
-            df_mask = df_value.notna()
+            df_mask = df_value.isna()
             df_mask = (df_value<0) | (df_mask)
 
         return df_mask, df_value, locations
@@ -297,18 +298,19 @@ class Stations_organisation():
 
 class Stations_combined():
     """Class that combines the resampled timeseries of all organisations."""
-    def __init__(self, folder, organisations, wiwb_combined, resample_rule):
+    def __init__(self, folder, organisations, wiwb_combined, resample_rule, settings_all):
         self.folder = folder
         self.organisations=organisations
         self.stations_org={} #dict with classes of all organisations
         self.stations_df = self.load_stations_gdf()
         self.wiwb_combined = wiwb_combined
         self.resample_rule = resample_rule
+        self.settings_all = settings_all
 
         for organisation in self.organisations:
             self.stations_org[organisation] = Stations_organisation(folder=self.folder,
                                     organisation=organisation,
-                                    settings=None)
+                                    settings=settings_all.org[organisation])
 
 
     def load_stations_gdf(self):
@@ -332,8 +334,8 @@ class Stations_combined():
             stat = self.stations_org[organisation]
             stat.load(resample_rule=self.resample_rule)
 
-            dict_values[stat.organisation] = stat.df_value
-            dict_mask[stat.organisation] = stat.df_mask
+            dict_values[organisation] = stat.df_value
+            dict_mask[organisation] = stat.df_mask
 
         self.df_value = self.merge_df_datetime(dict_df=dict_values)
         self.df_mask = self.merge_df_datetime(dict_df=dict_mask)
@@ -373,8 +375,12 @@ class Stations_combined():
         """when iterating over 'self' this will yield the station classes."""
         for index, row in self.stations_df.iterrows():
             
-            if row['ID'] in self.df_value.columns:
-                yield self.get_station(row)
+            if (row['ID'] in self.df_value.columns):
+                if row['WEERGAVENAAM'] in self.df_irc['irc_early']:
+                    yield self.get_station(row)
+                else:
+                    print(f"{row['ID']} -- Missing wiwb timeseries")
+
             else:
                 print(f"{row['ID']} -- Missing timeseries")
                 pass
