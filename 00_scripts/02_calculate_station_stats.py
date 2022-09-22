@@ -72,6 +72,7 @@ for resample_rule in ["d", "h"]:
 
 # %%
 # Combine statistics of all stations in geodataframe
+
 for resample_rule in ["d", "h"]:
 
     for code in stations_stats[resample_rule]:
@@ -79,25 +80,62 @@ for resample_rule in ["d", "h"]:
 
 
         for irc_type in station_stats.station.irc_types:
-            gdf.loc[code, f'stat_rel_bias_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].RelBiasTotal
+            gdf.loc[code, f'bias_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].RelBiasTotal
             gdf.loc[code, f'stat_rel_bias_cumu_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].relbiastotalcumu
-            gdf.loc[code, f'stat_stdev_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].stdev
+            gdf.loc[code, f'stdev_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].stdev
             gdf.loc[code, f'stat_corr_{irc_type}'] = station_stats.irc_stats[irc_type].corr
+
+
 
 # Save to file
 gdf.to_file(f"../01_data/ground_stations_stats.gpkg", driver="GPKG")
 
 # %%
-plt.ioff()
+from matplotlib.gridspec import GridSpec
+idx = pd.IndexSlice
+fig = plt.figure(figsize=(11,16))
+gs = GridSpec(4, 2, figure=fig)
+
+
 
 for code in stations_stats[resample_rule]:
     print(code)
-    for resample_rule in ["d", "h"]:
-    #  plot some station statistics of indiviual station
-        for irc_type in settings_all.wiwb.keys():
-            station_stats = stations_stats[resample_rule][code]
-            fig = station_stats.plot_scatter(irc_type=irc_type)
-            fig.savefig(f"../02_img/{irc_type}/{code}_{resample_rule}.png")
-            
-            plt.close(fig)
+    fig.suptitle(f"{code}", fontsize=20)
+    station_stats = stations_stats[resample_rule][code]
 
+    for i, irc_type in enumerate(settings_all.wiwb.keys()):
+        for j, resample_rule in enumerate(["h", "d"]):
+            ax = fig.add_subplot(gs[i, j])
+            station_stats = stations_stats[resample_rule][code]
+            station_stats.plot_scatter_ax(irc_type=irc_type, ax=ax)
+
+
+    stats = ["bias", "stdev"]
+    time = ["h", "d"]
+
+    indexes = pd.MultiIndex.from_product([stats, time], names=["stats", "agg"])
+    columns = ['irc_realtime', 'irc_early', 'irc_final']
+    dfstats = pd.DataFrame(columns=columns, index=indexes)
+    for irc in columns:
+        for stat in stats:
+            for t in time:
+                dfstats.loc[idx[stat, t], irc] = round(gdf.loc[code, f"{stat}_{irc}_{t}"], 2)
+    dfstats = dfstats.reset_index(level=1)
+
+    axtable = plt.subplot(gs[3, :])
+    table = axtable.table(cellText=dfstats.values, 
+        colLabels=dfstats.columns, 
+        rowLabels=dfstats.index,
+        cellLoc ='center',  
+        loc ='upper left') 
+
+    axtable.axis('off') #remove graph
+    axtable.set_title(f'Statistieken: {code}', fontweight ="bold") #set title
+    plt.tight_layout()
+    
+    fig.savefig(f"../02_img/{code}.png")
+
+    plt.clf()
+
+
+# %%
