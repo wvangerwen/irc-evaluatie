@@ -57,13 +57,47 @@ class StationStats():
         self.irc_stats={}
         for irc_type in self.station.irc_types:
             self.irc_stats[irc_type] = IrcStats(stationstats=self, irc_type=irc_type)
-                
 
-    def plot_scatter(self, irc_type):
-        """Scatterplot comparing radar composite to ground station measurements"""
+    def plot_scatter_ax(self, irc_type, ax):
+        scatter = ax.scatter(x=self.df['station'], y=self.df[irc_type], c=self.df['class'])
+
+        handles, labels = scatter.legend_elements() #TODO add number of features in certain class.
+        labels = [self.classes.set_index('value').loc[int(re.findall(r'[0-9]+', i)[0])]['legend'] for i in labels] #Get legend label from dataframe based on the class.
+        legend = ax.legend(handles, labels, loc="lower right", title="Class")
+        ax.add_artist(legend)
+
+        # set axes
+        ax.set_xlim(xmin=0)
+        ax.set_ylim(ymin=0)
+        ax.grid()
+
+        # straight line
+        line = ax.plot(ax.get_xlim(), ax.get_xlim(), label='_nolegend_')
+
+        #Add text        
+        scatter_text = f"""CV = {self.irc_stats[irc_type].CV} \nRel. bias = {self.irc_stats[irc_type].RelBiasTotal}%"""
+
+        ax.text(0.02, 0.98, scatter_text, horizontalalignment='left',
+            verticalalignment='top', transform=ax.transAxes,
+            bbox=dict(facecolor='white', alpha=0.9))
+
+        ax.set_title(f"{irc_type} - {self.station.resample_text}", y=1, fontsize=16)
+
+
+        if self.station.resample_text=='1h':
+            timestr = 'Uur'
+        elif self.station.resample_text=='24h':
+            timestr='Dag'
+        ax.set_xlabel(f'{timestr}som regenmeter [mm]', fontsize=16)
+        ax.set_ylabel(f'{timestr}som radar [mm]', fontsize=16)
+        ax.plot(1,0)
+        return ax                
+
+    def plot_scatter(self, irc_type, ax):
+        """Scatterplot comparing radar composite to ground station measurements""" 
         #Init figure
         
-        fig, ax = plt.subplots(figsize=[10,6])
+        fig, ax = plt.subplots()
         ax = plt.gca()
 
         # Plot values
@@ -90,7 +124,7 @@ class StationStats():
             bbox=dict(facecolor='white', alpha=0.9))
 
 
-        fig.suptitle(f"{self.station.name} - {self.station.organisation}", fontsize=20)
+        #fig.suptitle(f"{self.station.name} - {self.station.organisation}", fontsize=20)
         plt.title(f"{irc_type} - {self.station.resample_text}", y=1, fontsize=16)
 
 
@@ -100,7 +134,8 @@ class StationStats():
             timestr='Dag'
         plt.xlabel(f'{timestr}som regenmeter [mm]', fontsize=16)
         plt.ylabel(f'{timestr}som radar [mm]', fontsize=16)
-        return fig
+        ax.plot(1,0)
+        return ax
 
     def create_classes(self):
         """Table used to classify the station p values"""
