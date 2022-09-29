@@ -39,23 +39,23 @@ class IrcSettings:
 
         self.wiwb = {
             "irc_realtime": {
-                "raw_filepaths": folder.input.paths["wiwb"]["raw"].pl.glob(
-                    "*irc_realtime*.parquet"
-                )
+                "raw_filepaths": [i for i in folder.input.paths["wiwb"]["raw"].pl.glob(
+                    "*irc_realtime_raw*.parquet"
+                )]
             },
             "irc_early": {
-                "raw_filepaths": folder.input.paths["wiwb"]["raw"].pl.glob(
-                    "*irc_early*.parquet"
-                )
+                "raw_filepaths": [i for i in folder.input.paths["wiwb"]["raw"].pl.glob(
+                    "*irc_early_raw*.parquet"
+                )]
             },
             "irc_final": {
-                "raw_filepaths": folder.input.paths["wiwb"]["raw"].pl.glob(
-                    "*irc_final*.parquet"
-                )
+                "raw_filepaths": [i for i in folder.input.paths["wiwb"]["raw"].pl.glob(
+                    "*irc_final_raw*.parquet"
+                )]
             },
             "irc_realtime_beta": {
-                "raw_filepaths": folder.input.paths["wiwb"]["raw"].pl.glob(
-                    "*irc_realtime_beta*.parquet"
-                )
+                "raw_filepaths": [i for i in folder.input.paths["wiwb"]["raw"].pl.glob(
+                    "*irc_realtime_beta_raw*.parquet"
+                )]
             },
         }

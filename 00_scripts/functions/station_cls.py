@@ -439,13 +439,22 @@ class Stations_combined:
 
     def __iter__(self):
         """when iterating over 'self' this will yield the station classes."""
+        
+        # Check if all irc items are available
+        # avail = self.stations_df.apply(lambda x: [x['WEERGAVENAAM'] in self.df_irc[key] for key in self.df_irc.keys()], axis=1)
         for index, row in self.stations_df.iterrows():
 
+
+
             if row["ID"] in self.df_value.columns:
-                if row["WEERGAVENAAM"] in self.df_irc["irc_early"]:
+                avail = {}
+                for key in self.df_irc.keys():
+                    avail[key] = row["WEERGAVENAAM"] in self.df_irc[key] 
+                
+                if np.all(list(avail.values())):
                     yield self.get_station(row)
                 else:
-                    print(f"{row['ID']} -- Missing wiwb timeseries")
+                    print(f"{row['ID']} -- Missing wiwb timeseries \n {avail}")
 
             else:
                 print(f"{row['ID']} -- Missing timeseries")
@@ -492,7 +501,7 @@ class Wiwb_combined:
             # First check if all output already exists
             if overwrite == False:
                 for resample_rule in ["h", "d"]:
-                    if os.path.exists(self.out_path[resample_rule]):
+                    if os.path.exists(self.out_path[irc_type][resample_rule]):
                         cont.append(False)
 
             if np.all(cont) == True:
