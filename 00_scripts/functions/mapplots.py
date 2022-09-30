@@ -32,6 +32,7 @@ def returntitle(col):
         "bias_irc_realtime_d": "BIAS (%); IRC Realtime",
         "bias_irc_early_d": "BIAS (%); IRC Early Reanalysis",
         "bias_irc_final_d": "BIAS (%); IRC Final Reanalysis",
+        "bias_irc_realtime_beta_d": "BIAS (%); IRC Realtime BETA",
     }
     return coltotitle.get(col)
 
@@ -84,6 +85,7 @@ def plotirc():
         "bias_irc_realtime_d",
         "bias_irc_early_d",
         "bias_irc_final_d",
+        "bias_irc_realtime_beta_d",
     ]
     for col in cols:
         figs.append(mapplot(gdf, col))
