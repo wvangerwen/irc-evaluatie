@@ -99,7 +99,7 @@ for resample_rule in ["d", "h"]:
                     code, f"bias_cumu_{irc_type}_{resample_rule}"
                 ] = station_stats.irc_stats[irc_type].RelBiasTotalCumu
 
-            # gdf.loc[code, f"stdev_{irc_type}_{resample_rule}"] = station_stats.irc_stats[irc_type].stdev
+            gdf.loc[code, f"stdev_{irc_type}_{resample_rule}"] = station_stats.irc_stats[irc_type].stdev
             # gdf.loc[code, f"stat_corr_{irc_type}"] = station_stats.irc_stats[irc_type].corr
 
     # Save to file
@@ -151,7 +151,9 @@ for code in stations_stats[resample_rule]:
     axtable.set_title(f"Statistieken: {code}", fontweight="bold")  # set title
     plt.tight_layout()
 
-    fig.savefig(f"../02_img/{code}.png")
+    org=gdf.loc[code, "organisation"]
+    wgvnaam = gdf.loc[code, "WEERGAVENAAM"]
+    fig.savefig(f"../02_img/{org}_{wgvnaam}_{code}.png")
 
     plt.clf()
 
