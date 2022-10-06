@@ -70,7 +70,7 @@ class Stations_organisation:
 
             # Set datetime as index
             df["datetime"] = pd.to_datetime(df["datetime"]) - pd.Timedelta(
-                f"01:00:00"
+                f"01:00:00" #De data staat in UTC+1 (tijdreeksen FEWS komen in winter overeen en in zomer zijn de tijden uit de csv -1 uur tov fews.)
             )  # change time to utc
             df.set_index("datetime", inplace=True)
 
@@ -357,7 +357,7 @@ class Stations_combined:
     """Class that combines the resampled timeseries of all organisations."""
 
     def __init__(
-        self, folder, organisations, wiwb_combined, resample_rule, settings_all
+        self, folder, organisations, wiwb_combined, resample_rule, settings_all,
     ):
         self.folder = folder
         self.organisations = organisations

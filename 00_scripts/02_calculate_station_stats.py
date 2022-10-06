@@ -1,5 +1,7 @@
 # %%
+from symbol import except_clause
 import sys
+from warnings import filterwarnings
 
 for x in [
     "C:/Users/wvangerwen/AppData/Roaming/3Di/QGIS3/profiles/default/python/plugins/hhnk_threedi_plugin/external-dependencies",
@@ -75,7 +77,7 @@ for resample_rule in ["d", "h"]:
     stations_stats[resample_rule] = {}
     for station in stations_combined:
         print(station.code)
-        # if station.code == 'TML0109405': #Testen met 1 station.
+        # if station.code == "TML0109405": #Testen met 1 station.
         stations_stats[resample_rule][station.code] = station_statistics.StationStats(
             station
         )
@@ -97,8 +99,8 @@ for resample_rule in ["d", "h"]:
                     code, f"bias_cumu_{irc_type}_{resample_rule}"
                 ] = station_stats.irc_stats[irc_type].RelBiasTotalCumu
 
-            # gdf.loc[code, f'stdev_{irc_type}_{resample_rule}'] = station_stats.irc_stats[irc_type].stdev
-            # gdf.loc[code, f'stat_corr_{irc_type}'] = station_stats.irc_stats[irc_type].corr
+            # gdf.loc[code, f"stdev_{irc_type}_{resample_rule}"] = station_stats.irc_stats[irc_type].stdev
+            # gdf.loc[code, f"stat_corr_{irc_type}"] = station_stats.irc_stats[irc_type].corr
 
     # Save to file
     gdf.to_file(f"../01_data/ground_stations_stats.gpkg", driver="GPKG")
@@ -154,4 +156,3 @@ for code in stations_stats[resample_rule]:
     plt.clf()
 
 
-# %%
