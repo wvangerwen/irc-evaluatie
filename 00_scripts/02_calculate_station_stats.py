@@ -74,12 +74,10 @@ for resample_rule in ["d", "h"]:
     # Calculate statistics per station.
     stations_stats[resample_rule] = {}
     for station in stations_combined:
-        print(station.code)
         # if station.code == 'TML0109405': #Testen met 1 station.
         stations_stats[resample_rule][station.code] = station_statistics.StationStats(
             station
         )
-
 
 # %%
 # Combine statistics of all stations in geodataframe
@@ -92,6 +90,9 @@ for resample_rule in ["d", "h"]:
             gdf.at[code, f"bias_{irc_type}_{resample_rule}"] = station_stats.irc_stats[
                 irc_type
             ].RelBiasTotal
+            gdf.at[code, f"stdev_{irc_type}_{resample_rule}"] = station_stats.irc_stats[
+                irc_type
+            ].stdev
             if irc_type == "irc_final":
                 gdf.at[
                     code, f"bias_cumu_{irc_type}_{resample_rule}"
@@ -108,7 +109,7 @@ from matplotlib.gridspec import GridSpec
 
 idx = pd.IndexSlice
 fig = plt.figure(figsize=(11, 16))
-gs = GridSpec(4, 2, figure=fig)
+gs = GridSpec(5, 2, figure=fig)
 
 
 for code in stations_stats[resample_rule]:
@@ -136,7 +137,7 @@ for code in stations_stats[resample_rule]:
                 )
     dfstats = dfstats.reset_index(level=1)
 
-    axtable = plt.subplot(gs[3, :])
+    axtable = plt.subplot(gs[4, :])
     table = axtable.table(
         cellText=dfstats.values,
         colLabels=dfstats.columns,
@@ -155,3 +156,8 @@ for code in stations_stats[resample_rule]:
 
 
 # %%
+import functions.mapplots as mapplots
+
+figs, cols = mapplots.plotirc()
+for fig, col in zip(figs, cols):
+    fig.write_html(f"../02_img/html-maps/{col}.html")
