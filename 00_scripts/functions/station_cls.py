@@ -299,7 +299,8 @@ class Stations_organisation:
 
     # Toevoegen locaties van xml aan de gpkg
     def add_locations_to_gpkg(self, locations):
-        """Add locations from xml to the stations gpkg"""
+        """Add locations from xml to the stations gpkg, the other locations have been 
+        added manually to the gpkg already"""
         if locations is not None:  # For HHNK the locations are None
             stations_df = gpd.read_file(self.folder.input.ground_stations.path)
             stations_df_orig = stations_df.copy()
