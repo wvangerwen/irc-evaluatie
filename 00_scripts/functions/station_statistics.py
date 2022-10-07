@@ -20,7 +20,7 @@ class IrcStats:
         self.irc_cumu = self.irc.cumsum().iloc[-1]
         self.BiasTotalCumu = self.irc_cumu - self.gauge_cumu
         self.corr = round(self.gauge.corr(self.irc), 2)
-        self.stdev = self.residuals.std()
+        self.stdev = round(self.residuals.std(), 2)
 
         if self.gauge_mean == 0:
             self.CV = 0
@@ -89,7 +89,7 @@ class StationStats:
         line = ax.plot(ax.get_xlim(), ax.get_xlim(), label="_nolegend_")
 
         # Add text
-        scatter_text = f"""CV = {self.irc_stats[irc_type].CV} \nRel. bias = {self.irc_stats[irc_type].RelBiasTotal}%"""
+        scatter_text = f"""STDEV = {self.irc_stats[irc_type].stdev} \nRel. bias = {self.irc_stats[irc_type].RelBiasTotal}%"""
 
         ax.text(
             0.02,

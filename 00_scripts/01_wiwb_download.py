@@ -29,8 +29,8 @@ os.environ["WIWB_USERNAME"] = "wsbd"
 os.environ["WIWB_PASSWORD"] = "4B83lSttDBity1kBtYzO"
 
 
-start_date = datetime.datetime(2022, 1, 1)
-end_date = datetime.datetime(2022, 6, 1)
+start_date = datetime.datetime(2022, 9, 1)
+end_date = datetime.datetime(2022, 10, 1)
 
 locs = gpd.read_file("../01_data/ground_stations.gpkg")
 locs = locs[locs["use"] == True]
@@ -39,7 +39,9 @@ DATA_SOURCES = {
     "irc_realtime": "KNMI IRC Realtime",
     "irc_early": "KNMI IRC Early Reanalysis",
     "irc_final": "KNMI IRC Final Reanalysis",
-    "irc_realtime_beta": "KNMI IRC TEST",
+    "irc_realtime_beta": "KNMI IRC Realtime BETA",
+    # "irc_early_beta": "KNMI IRC Early BETA",
+    # "irc_final_beta": "KNMI IRC Final BETA",
 }
 
 MAX_END_DATE = {
@@ -47,6 +49,8 @@ MAX_END_DATE = {
     "irc_early": datetime.datetime.now() - datetime.timedelta(days=4),
     "irc_final": datetime.datetime.now() - datetime.timedelta(days=30),
     "irc_realtime_beta": datetime.datetime.now() - datetime.timedelta(hours=1),
+    # "irc_early_beta": datetime.datetime.now() - datetime.timedelta(days=4),
+    # "irc_final_beta": datetime.datetime.now() - datetime.timedelta(days=30),
 }
 
 ORGANISATIONS = ["HHNK", "HDSR", "WL", "HEA", "WF"]
