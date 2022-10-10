@@ -42,6 +42,7 @@ class Stations_organisation:
         self.organisation = organisation
         self.folder = folder
         self.settings = settings
+        self.stations_df = self.load_stations_gdf()
 
         self.out_path = self.set_out_path()
 
@@ -97,8 +98,6 @@ class Stations_organisation:
             df_value = df_value.applymap(str_to_float)
             df_value.astype(float)
 
-            # make sure negative values are masked
-            df_mask = (df_value < 0) | (df_mask)
             locations = None
 
         if self.organisation in ["HDSR", "WL"]:
@@ -168,9 +167,6 @@ class Stations_organisation:
                 # Replace string values with mask, to identify which timeseries we do use.
                 masked_values = {200: False, "0": True}
                 df_mask_single.replace(masked_values, inplace=True)
-
-                # make sure negative values are masked
-                df_mask_single = (df_value_single < 0) | (df_mask_single)
                 df_mask_single.name = station_id
 
                 df_value_dict[station_id] = df_value_single.copy()
@@ -179,14 +175,6 @@ class Stations_organisation:
             df_value = self.merge_df_datetime(df_value_dict)
             df_mask = self.merge_df_datetime(df_mask_dict)
 
-            # Fill nan values so resample works properly
-            if self.organisation == "HEA":
-                fillna_value = False  # HEA doesnt have equidistant timeseries, so missing data is not filtered
-            else:
-                fillna_value = True
-            df_mask.fillna(
-                fillna_value, inplace=True
-            )  # Resample doesnt handle Nan values well.
 
             locations = pd.read_excel(self.settings["metadata_file"])
 
@@ -231,12 +219,11 @@ class Stations_organisation:
             df_value = df
             df_value.astype(float)
 
-            # Create mask and make sure negative values are masked
+            # Create mask
             df_mask = df_value.isna()
-            df_mask = (df_value < 0) | (df_mask)
 
-        if self.organisation=="WAM":
-            df_mask_dict = {}
+        if self.organisation == "WAM":
+            #WAM has 2 csvs
             df_value_dict = {}
             for raw_fp in Path(self.settings["raw_filepath"]).glob("*csv"):
                 # Load timeseries
@@ -261,6 +248,7 @@ class Stations_organisation:
                 
                 df = df.tz_localize(None)  # data is alreadt UTC remove tz info so we can merge.
                 
+                #create one column per station
                 df2 = pd.DataFrame()
                 for col in df["object_id"].unique():
                     df2[col] = df.loc[df["object_id"]==col, "value"]
@@ -269,25 +257,30 @@ class Stations_organisation:
                 # Split into mask and value series
                 df_value_single = df2.copy()  # values
 
-                # Create a mask df from the flags
-                df_mask_single = df2.isna()  # flags
-
-
-                # make sure negative values are masked
-                df_mask_single = (df_value_single < 0) | (df_mask_single)
-
                 df_value_dict[raw_fp] = df_value_single.copy()
-                df_mask_dict[raw_fp] = df_mask_single.copy()
 
-            df_value = self.merge_df_datetime(df_value_dict)
-            df_mask = self.merge_df_datetime(df_mask_dict)
+            df_value = self.merge_df_datetime(df_value_dict)            
+            df_mask = df_value.isna()
             
-            fillna_value = True
-            df_mask.fillna(
-                fillna_value, inplace=True
-            )  # Resample doesnt handle Nan values well.
-
             locations=None
+
+        # make sure negative values are masked
+        df_mask = (df_value < 0) | (df_mask)
+
+        # Fill nan values so resample works properly
+        if self.organisation == "HEA":
+            fillna_value = False  # HEA doesnt have equidistant timeseries, so missing data is not filtered
+        else:
+            fillna_value = True
+        df_mask.fillna(
+            fillna_value, inplace=True
+        )  # Resample doesnt handle Nan values well.
+
+        #filter station data with start_date before start_date in stations_df
+        gdf_filter = self.stations_df[self.stations_df["start_date"].notna()] #filter stations with startdate
+        gdf_filter = gdf_filter[gdf_filter["ID"].isin(df_mask.keys())] #filter available stations
+        for index, row in gdf_filter.iterrows():
+            df_mask.loc[df_mask[row["ID"]].index < row["start_date"], row["ID"]] = True
 
         return df_mask, df_value, locations
 
@@ -403,6 +396,11 @@ class Stations_organisation:
                 stations_df.to_file(
                     self.folder.input.ground_stations.path, driver="GPKG"
                 )
+
+    def load_stations_gdf(self):
+        gdf = gpd.read_file(self.folder.input.ground_stations.path)
+        # gdf = gdf[gdf["organisation"].isin(self.organisations)]
+        return gdf[gdf["use"] == True]
 
     def __repr__(self):
         return "." + " .".join([i for i in dir(self) if not i.startswith("__")])

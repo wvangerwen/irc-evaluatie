@@ -27,19 +27,13 @@ folder = folders.Folders(os.pardir)  # create folder structure from parent dir.
 settings_all = irc_settings.IrcSettings(folder=folder)
 
 
-
-
-
-
-
-
 # %%
 # Resample data
 
 # Station
 for organisation in settings_all.org:
 
-# for organisation in ['WAM']:
+# for organisation in ["WAM"]:
     stations_organisation = station_cls.Stations_organisation(
         folder=folder,
         organisation=organisation,
@@ -47,7 +41,7 @@ for organisation in settings_all.org:
     )
 
     # Resample timeseries to hour and day values.
-    locations = stations_organisation.resample(overwrite=False)
+    locations = stations_organisation.resample(overwrite=True)
 
     # Add locations from xml to the gpkg
     stations_organisation.add_locations_to_gpkg(locations)
