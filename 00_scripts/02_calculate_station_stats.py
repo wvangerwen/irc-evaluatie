@@ -38,6 +38,7 @@ folder = folders.Folders(os.pardir)  # create folder structure from parent dir.
 
 # Alle stations in ruwe data.
 # Hier alle stations met bijhorende metadata in plaatsen. De bijhorende timeseries moeten
+
 # de naamgeving volgen die in folders.InputPath zijn gedefineerd.
 stations_df = gpd.read_file(folder.input.ground_stations.path)
 
@@ -45,7 +46,8 @@ settings_all = irc_settings.IrcSettings(folder=folder)
 
 #%%
 # Combine stations into one df
-organisations = ["HHNK", "HDSR", "WL", "HEA", "WF"]
+organisations = ["HHNK", "HDSR", "WL", "HEA", "WF", "WAM"]
+# organisations = ["HHNK"]
 
 gdf = station_cls.Stations_combined(
     folder=folder,
@@ -55,6 +57,7 @@ gdf = station_cls.Stations_combined(
     settings_all=None,
 ).stations_df.copy()
 gdf.set_index("ID", inplace=True)
+
 
 stations_stats = {}
 for resample_rule in ["d", "h"]:
@@ -77,10 +80,11 @@ for resample_rule in ["d", "h"]:
     stations_stats[resample_rule] = {}
     for station in stations_combined:
         print(station.code)
-        # if station.code == "TML0109405": #Testen met 1 station.
+        # if station.code == "MPN-AS-2014": #Testen met 1 station.
         stations_stats[resample_rule][station.code] = station_statistics.StationStats(
             station
         )
+
 
 # %%
 # Combine statistics of all stations in geodataframe
@@ -111,7 +115,7 @@ for resample_rule in ["d", "h"]:
 from matplotlib.gridspec import GridSpec
 
 idx = pd.IndexSlice
-fig = plt.figure(figsize=(11, 16))
+fig = plt.figure(figsize=(11, 16), facecolor='white')
 gs = GridSpec(5, 2, figure=fig)
 
 
@@ -130,7 +134,7 @@ for code in stations_stats[resample_rule]:
     time = ["h", "d"]
 
     indexes = pd.MultiIndex.from_product([stats, time], names=["stats", "agg"])
-    columns = ["irc_realtime", "irc_early", "irc_final"]
+    columns = ["irc_realtime", "irc_early", "irc_final", "irc_realtime_beta"]
     dfstats = pd.DataFrame(columns=columns, index=indexes)
     for irc in columns:
         for stat in stats:

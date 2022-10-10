@@ -26,13 +26,20 @@ folder = folders.Folders(os.pardir)  # create folder structure from parent dir.
 
 settings_all = irc_settings.IrcSettings(folder=folder)
 
+
+
+
+
+
+
+
 # %%
 # Resample data
 
 # Station
 for organisation in settings_all.org:
 
-# for organisation in ['HHNK']:
+# for organisation in ['WAM']:
     stations_organisation = station_cls.Stations_organisation(
         folder=folder,
         organisation=organisation,
@@ -49,4 +56,5 @@ for organisation in settings_all.org:
 # Wiwb
 wiwb_combined = station_cls.Wiwb_combined(folder=folder, settings=settings_all.wiwb)
 wiwb_combined.resample(overwrite=True)
+
 

@@ -29,7 +29,7 @@ os.environ["WIWB_USERNAME"] = "wsbd"
 os.environ["WIWB_PASSWORD"] = "4B83lSttDBity1kBtYzO"
 
 
-start_date = datetime.datetime(2022, 9, 1)
+start_date = datetime.datetime(2022, 1, 1)
 end_date = datetime.datetime(2022, 10, 1)
 
 locs = gpd.read_file("../01_data/ground_stations.gpkg")
@@ -53,8 +53,8 @@ MAX_END_DATE = {
     # "irc_final_beta": datetime.datetime.now() - datetime.timedelta(days=30),
 }
 
-ORGANISATIONS = ["HHNK", "HDSR", "WL", "HEA", "WF"]
-# ORGANISATIONS = ["WF"]
+ORGANISATIONS = ["HHNK", "HDSR", "WL", "HEA", "WF", "WAM"]
+ORGANISATIONS = ["WAM"]
 
 # %%
 

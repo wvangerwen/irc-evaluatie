@@ -35,6 +35,15 @@ class IrcSettings:
                 "skiprows": 0,
                 "date_col": "CET/CEST",
             },
+            
+            "WAM":{
+                "raw_filepath": folder.input.paths["station"]["raw"].full_path(
+                    "WAM"
+                ),
+                "skiprows": 0,
+                "sep":",",
+                "date_col": "start_date",
+            },
         }
 
         self.wiwb = {

@@ -235,6 +235,60 @@ class Stations_organisation:
             df_mask = df_value.isna()
             df_mask = (df_value < 0) | (df_mask)
 
+        if self.organisation=="WAM":
+            df_mask_dict = {}
+            df_value_dict = {}
+            for raw_fp in Path(self.settings["raw_filepath"]).glob("*csv"):
+                # Load timeseries
+                df = pd.read_csv(
+                    raw_fp, sep=self.settings["sep"], skiprows=self.settings["skiprows"]
+                )  # , parse_dates=[date_col])
+
+                df.rename(
+                    {
+                        self.settings["date_col"]: "datetime",
+                        "sum_value": "value",
+                    },
+                    inplace=True,
+                    axis=1,
+                )
+
+                # Set datetime as index
+                df["datetime"] = pd.to_datetime(
+                    df["datetime"], format="%Y-%m-%d %H:%M:%S"
+                )
+                df.set_index("datetime", inplace=True)
+                
+                df = df.tz_localize(None)  # data is alreadt UTC remove tz info so we can merge.
+                
+                df2 = pd.DataFrame()
+                for col in df["object_id"].unique():
+                    df2[col] = df.loc[df["object_id"]==col, "value"]
+
+
+                # Split into mask and value series
+                df_value_single = df2.copy()  # values
+
+                # Create a mask df from the flags
+                df_mask_single = df2.isna()  # flags
+
+
+                # make sure negative values are masked
+                df_mask_single = (df_value_single < 0) | (df_mask_single)
+
+                df_value_dict[raw_fp] = df_value_single.copy()
+                df_mask_dict[raw_fp] = df_mask_single.copy()
+
+            df_value = self.merge_df_datetime(df_value_dict)
+            df_mask = self.merge_df_datetime(df_mask_dict)
+            
+            fillna_value = True
+            df_mask.fillna(
+                fillna_value, inplace=True
+            )  # Resample doesnt handle Nan values well.
+
+            locations=None
+
         return df_mask, df_value, locations
 
     @staticmethod
@@ -377,6 +431,7 @@ class Stations_combined:
 
     def load_stations_gdf(self):
         gdf = gpd.read_file(self.folder.input.ground_stations.path)
+        # gdf = gdf[gdf["organisation"].isin(self.organisations)]
         return gdf[gdf["use"] == True]
 
     @staticmethod
@@ -444,9 +499,6 @@ class Stations_combined:
         # Check if all irc items are available
         # avail = self.stations_df.apply(lambda x: [x['WEERGAVENAAM'] in self.df_irc[key] for key in self.df_irc.keys()], axis=1)
         for index, row in self.stations_df.iterrows():
-
-
-
             if row["ID"] in self.df_value.columns:
                 avail = {}
                 for key in self.df_irc.keys():
@@ -456,10 +508,10 @@ class Stations_combined:
                     yield self.get_station(row)
                 else:
                     print(f"{row['ID']} -- Missing wiwb timeseries \n {avail}")
-
             else:
                 print(f"{row['ID']} -- Missing timeseries")
-                pass
+
+
 
     def __repr__(self):
         return "." + " .".join([i for i in dir(self) if not i.startswith("__")])
